@@ -25,3 +25,8 @@ type PodInput struct {
 	Meta       PodMeta
 	Containers map[ContainerID]ContainerMeta
 }
+
+type ContainerView struct {
+	Meta    ContainerMeta
+	PodMeta PodMeta
+}

@@ -9,17 +9,6 @@ const (
 	notFound = "not-found"
 )
 
-type KubeInfo struct {
-	PodID         string
-	PodName       string
-	Namespace     string
-	ContainerName string
-	WorkloadName  string
-	WorkloadType  string
-	ContainerID   string
-	Labels        Labels
-}
-
 var (
 	// ErrMissingPodUID is returned when no Pod UID could be found for the given cgroup ID.
 	ErrMissingPodUID = errors.New("missing pod UID for cgroup ID")
@@ -29,7 +18,7 @@ var (
 	ErrMissingPodInfo = errors.New("missing pod info for found pod ID")
 )
 
-func (r *Resolver) GetKubeInfo(cgID CgroupID) (*KubeInfo, error) {
+func (r *Resolver) GetContainerView(cgID CgroupID) (*ContainerView, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -45,6 +34,8 @@ func (r *Resolver) GetKubeInfo(cgID CgroupID) (*KubeInfo, error) {
 
 	containerName := notFound
 	containerID := notFound
+	// even if we have the pod in the cache we need to check
+	// we have the container associated with the cgroupID.
 	for cID, info := range pod.containers {
 		if cgID == info.CgroupID {
 			containerName = info.Name
@@ -53,14 +44,12 @@ func (r *Resolver) GetKubeInfo(cgID CgroupID) (*KubeInfo, error) {
 		}
 	}
 
-	return &KubeInfo{
-		PodID:         podID,
-		PodName:       pod.meta.Name,
-		Namespace:     pod.meta.Namespace,
-		ContainerName: containerName,
-		WorkloadName:  pod.meta.WorkloadName,
-		WorkloadType:  pod.meta.WorkloadType,
-		ContainerID:   containerID,
-		Labels:        pod.meta.Labels,
+	return &ContainerView{
+		PodMeta: *pod.meta,
+		Meta: ContainerMeta{
+			ID:       containerID,
+			Name:     containerName,
+			CgroupID: cgID,
+		},
 	}, nil
 }
