@@ -83,7 +83,7 @@ func (r *Resolver) applyPolicyToPod(state *podState, applied policyByContainer) 
 		}
 		if err := r.cgroupToPolicyMapUpdateFunc(polID, []CgroupID{container.cgID}, bpf.AddPolicyToCgroups); err != nil {
 			return fmt.Errorf("failed to add policy to cgroups for pod %s, container %s, policy %s: %w",
-				state.podName(), container.name, state.policyLabel(), err)
+				state.podName(), container.name, state.policyName(), err)
 		}
 	}
 	return nil
@@ -106,7 +106,7 @@ func (r *Resolver) removePolicyFromPod(
 			PolicyIDNone, []CgroupID{container.cgID}, bpf.RemoveCgroups,
 		); err != nil {
 			return fmt.Errorf("failed to remove cgroups for pod %s, container %s, policy %s: %w",
-				podState.podName(), container.name, podState.policyLabel(), err)
+				podState.podName(), container.name, podState.policyName(), err)
 		}
 		if err := r.clearPolicyIDFromBPF(policyID); err != nil {
 			return fmt.Errorf("failed to clear policy for wp %s, container %s: %w", wpKey, container.name, err)
@@ -118,7 +118,7 @@ func (r *Resolver) removePolicyFromPod(
 
 // this must be called with the resolver lock held.
 func (r *Resolver) applyPolicyToPodIfPresent(state *podState) error {
-	policyName := state.policyLabel()
+	policyName := state.policyName()
 
 	// if the policy doesn't have the label we do nothing
 	if policyName == "" {
