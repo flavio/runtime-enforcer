@@ -130,6 +130,13 @@ test-bpf: generate-ebpf ## Run bpf tests.
 agent: generate-ebpf fmt ## Build agent binary.
 	CGO_ENABLED=0 GOOS=linux go build -o bin/agent ./cmd/agent
 
+# Version for kubectl plugin (git describe or "dev")
+KUBECTL_PLUGIN_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+
+.PHONY: kubectl-plugin
+kubectl-plugin:
+	go build -ldflags "-X main.version=$(KUBECTL_PLUGIN_VERSION)" -o ./cmd/kubectl-plugin/kubectl-runtime_enforcer ./cmd/kubectl-plugin
+
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/operator/main.go
