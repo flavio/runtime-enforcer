@@ -8,6 +8,7 @@ import (
 // dedupKey identifies a unique violation for deduplication purposes.
 type dedupKey struct {
 	PolicyName    string
+	Namespace     string
 	PodName       string
 	ContainerName string
 	ExePath       string
@@ -66,6 +67,7 @@ func NewBuffer() *Buffer {
 func (b *Buffer) Record(info ViolationInfo) {
 	key := dedupKey{
 		PolicyName:    info.PolicyName,
+		Namespace:     info.Namespace,
 		PodName:       info.PodName,
 		ContainerName: info.ContainerName,
 		ExePath:       info.ExePath,
