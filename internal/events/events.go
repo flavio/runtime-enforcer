@@ -14,9 +14,8 @@ import (
 )
 
 // Init creates an OTEL log provider that exports violation events to the given
-// gRPC endpoint over TLS. Unlike the trace pipeline (which reads from env vars),
-// this uses an explicit endpoint to keep the violation event path separate from
-// Security Hub traces. When caCertPath is non-empty, the connection verifies
+// gRPC endpoint over TLS. This uses an explicit endpoint to keep the violation
+// event path orthogonal. When caCertPath is non-empty, the connection verifies
 // the collector's certificate against the provided CA; otherwise the system
 // certificate pool is used.
 func Init(ctx context.Context, endpoint, caCertPath string) (otellog.Logger, func(context.Context) error, error) {
