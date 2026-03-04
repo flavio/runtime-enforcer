@@ -451,3 +451,45 @@ func TestGetViolationsByPolicy(t *testing.T) {
 		require.Empty(t, got)
 	})
 }
+
+func TestParsePolicyNamespacedName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    types.NamespacedName
+		wantErr bool
+	}{
+		{
+			name:  "valid namespace/name",
+			input: "default/my-policy",
+			want:  types.NamespacedName{Namespace: "default", Name: "my-policy"},
+		},
+		{
+			name:  "name with extra slashes",
+			input: "ns/name/with/slashes",
+			want:  types.NamespacedName{Namespace: "ns", Name: "name/with/slashes"},
+		},
+		{
+			name:    "no namespace",
+			input:   "just-a-name",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			input:   "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePolicyNamespacedName(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}

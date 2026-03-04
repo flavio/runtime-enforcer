@@ -69,7 +69,7 @@ func NewWorkloadPolicyStatusSync(
 	labels := strings.Split(config.AgentLabelSelector, ",")
 	for _, label := range labels {
 		parts := strings.Split(label, "=")
-		if len(parts) != 2 { //nolint:mnd // label is composed of 2 parts
+		if len(parts) != 2 { //nolint:mnd
 			return nil, fmt.Errorf("label should be in the format 'key=value': %s. Invalid selector %s",
 				label,
 				config.AgentLabelSelector)
@@ -191,8 +191,8 @@ func (r *WorkloadPolicyStatusSync) sync(
 
 	// Now we iterate over all WSPs and update their status based on the collected policies status from the agents
 	for _, wp := range wpList.Items {
-		nn := types.NamespacedName{Namespace: wp.Namespace, Name: wp.Name}
-		err := r.processWorkloadPolicy(ctx, &wp, nodesInfo, violationsByPolicy[nn])
+		namespacedName := types.NamespacedName{Namespace: wp.Namespace, Name: wp.Name}
+		err := r.processWorkloadPolicy(ctx, &wp, nodesInfo, violationsByPolicy[namespacedName])
 		if err != nil {
 			r.logger.Error(
 				err,
@@ -225,7 +225,11 @@ func (r *WorkloadPolicyStatusSync) getViolationsByPolicy(
 			continue
 		}
 		for _, v := range pbViolations {
-			nn := parsePolicyNamespacedName(v.GetPolicyName())
+			namespacedName, parseErr := parsePolicyNamespacedName(v.GetPolicyName())
+			if parseErr != nil {
+				r.logger.Error(parseErr, "skipping violation record", "node", nodeName)
+				continue
+			}
 			rec := v1alpha1.ViolationRecord{
 				Timestamp:      metav1.NewTime(v.GetTimestamp().AsTime()),
 				PodName:        v.GetPodName(),
@@ -234,7 +238,7 @@ func (r *WorkloadPolicyStatusSync) getViolationsByPolicy(
 				NodeName:       v.GetNodeName(),
 				Action:         v.GetAction(),
 			}
-			violationsByPolicy[nn] = append(violationsByPolicy[nn], rec)
+			violationsByPolicy[namespacedName] = append(violationsByPolicy[namespacedName], rec)
 		}
 	}
 
@@ -242,10 +246,12 @@ func (r *WorkloadPolicyStatusSync) getViolationsByPolicy(
 }
 
 // parsePolicyNamespacedName parses a "namespace/name" string into a NamespacedName.
-func parsePolicyNamespacedName(s string) types.NamespacedName {
-	parts := strings.SplitN(s, "/", 2) //nolint:mnd // namespace/name has 2 parts
-	if len(parts) == 2 {               //nolint:mnd // namespace/name has 2 parts
-		return types.NamespacedName{Namespace: parts[0], Name: parts[1]}
+// It returns an error if the string is not in the expected format, since all
+// policies are namespaced resources.
+func parsePolicyNamespacedName(s string) (types.NamespacedName, error) {
+	parts := strings.SplitN(s, "/", 2) //nolint:mnd
+	if len(parts) != 2 {               //nolint:mnd
+		return types.NamespacedName{}, fmt.Errorf("invalid policy name %q: expected namespace/name format", s)
 	}
-	return types.NamespacedName{Name: s}
+	return types.NamespacedName{Namespace: parts[0], Name: parts[1]}, nil
 }
