@@ -64,21 +64,23 @@ func (es *EventScraper) getKubeProcessInfo(event *bpf.ProcessEvent) *KubeProcess
 		cgIDLookup = event.CgroupID
 	}
 	es.logger.Debug("process event with empty cgIDTracker, falling back to cgroupID", "cgID", event.CgroupID)
-	info, err := es.resolver.GetKubeInfo(cgIDLookup)
+	containerView, err := es.resolver.GetContainerView(cgIDLookup)
 	if err == nil {
 		policyName := ""
-		if info.Labels != nil {
-			policyName = info.Labels[v1alpha1.PolicyLabelKey]
+		pod := containerView.PodMeta
+		container := containerView.Meta
+		if pod.Labels != nil {
+			policyName = pod.Labels[v1alpha1.PolicyLabelKey]
 		}
 
 		return &KubeProcessInfo{
-			Namespace:      info.Namespace,
-			Workload:       info.WorkloadName,
-			WorkloadKind:   info.WorkloadType,
-			ContainerName:  info.ContainerName,
+			Namespace:      pod.Namespace,
+			Workload:       pod.WorkloadName,
+			WorkloadKind:   pod.WorkloadType,
+			ContainerName:  container.Name,
 			ExecutablePath: event.ExePath,
-			PodName:        info.PodName,
-			ContainerID:    info.ContainerID,
+			PodName:        pod.Name,
+			ContainerID:    container.ID,
 			PolicyName:     policyName,
 		}
 	}

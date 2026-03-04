@@ -74,16 +74,20 @@ func (r *Resolver) clearPolicyIDFromBPF(policyID PolicyID) error {
 
 // applyPolicyToPod applies the given policy-by-container (add/update) to the pod's cgroups.
 // This must be called with the resolver lock held.
-func (r *Resolver) applyPolicyToPod(state *podState, applied policyByContainer) error {
+func (r *Resolver) applyPolicyToPod(state *podEntry, applied policyByContainer) error {
 	for _, container := range state.containers {
-		polID, ok := applied[container.name]
+		polID, ok := applied[container.Name]
 		if !ok {
 			// No entry for this container: either not in policy, or unchanged.
 			continue
 		}
-		if err := r.cgroupToPolicyMapUpdateFunc(polID, []CgroupID{container.cgID}, bpf.AddPolicyToCgroups); err != nil {
+		if err := r.cgroupToPolicyMapUpdateFunc(
+			polID,
+			[]CgroupID{container.CgroupID},
+			bpf.AddPolicyToCgroups,
+		); err != nil {
 			return fmt.Errorf("failed to add policy to cgroups for pod %s, container %s, policy %s: %w",
-				state.podName(), container.name, state.policyLabel(), err)
+				state.podName(), container.Name, state.policyName(), err)
 		}
 	}
 	return nil
@@ -94,31 +98,31 @@ func (r *Resolver) applyPolicyToPod(state *podState, applied policyByContainer) 
 // This must be called with the resolver lock held.
 func (r *Resolver) removePolicyFromPod(
 	wpKey NamespacedPolicyName,
-	podState *podState,
+	podEntry *podEntry,
 	wpState, removed policyByContainer,
 ) error {
-	for _, container := range podState.containers {
-		policyID, ok := removed[container.name]
+	for _, container := range podEntry.containers {
+		policyID, ok := removed[container.Name]
 		if !ok {
 			continue
 		}
 		if err := r.cgroupToPolicyMapUpdateFunc(
-			PolicyIDNone, []CgroupID{container.cgID}, bpf.RemoveCgroups,
+			PolicyIDNone, []CgroupID{container.CgroupID}, bpf.RemoveCgroups,
 		); err != nil {
 			return fmt.Errorf("failed to remove cgroups for pod %s, container %s, policy %s: %w",
-				podState.podName(), container.name, podState.policyLabel(), err)
+				podEntry.podName(), container.Name, podEntry.policyName(), err)
 		}
 		if err := r.clearPolicyIDFromBPF(policyID); err != nil {
-			return fmt.Errorf("failed to clear policy for wp %s, container %s: %w", wpKey, container.name, err)
+			return fmt.Errorf("failed to clear policy for wp %s, container %s: %w", wpKey, container.Name, err)
 		}
-		delete(wpState, container.name)
+		delete(wpState, container.Name)
 	}
 	return nil
 }
 
 // this must be called with the resolver lock held.
-func (r *Resolver) applyPolicyToPodIfPresent(state *podState) error {
-	policyName := state.policyLabel()
+func (r *Resolver) applyPolicyToPodIfPresent(state *podEntry) error {
+	policyName := state.policyName()
 
 	// if the policy doesn't have the label we do nothing
 	if policyName == "" {
@@ -206,12 +210,12 @@ func (r *Resolver) handleWPAdd(wp *v1alpha1.WorkloadPolicy) error {
 	}
 
 	// Now we search for pods that match the policy
-	for _, podState := range r.podCache {
-		if !podState.matchPolicy(wp.Name, wp.Namespace) {
+	for _, podEntry := range r.podCache {
+		if !podEntry.matchPolicy(wp.Name, wp.Namespace) {
 			continue
 		}
 
-		if err = r.applyPolicyToPod(podState, state); err != nil {
+		if err = r.applyPolicyToPod(podEntry, state); err != nil {
 			return err
 		}
 	}
@@ -265,14 +269,14 @@ func (r *Resolver) handleWPUpdate(wp *v1alpha1.WorkloadPolicy) error {
 		}
 	}
 
-	for _, podState := range r.podCache {
-		if !podState.matchPolicy(wp.Name, wp.Namespace) {
+	for _, podEntry := range r.podCache {
+		if !podEntry.matchPolicy(wp.Name, wp.Namespace) {
 			continue
 		}
-		if err = r.removePolicyFromPod(wpKey, podState, info.polByContainer, removedMap); err != nil {
+		if err = r.removePolicyFromPod(wpKey, podEntry, info.polByContainer, removedMap); err != nil {
 			return err
 		}
-		if err = r.applyPolicyToPod(podState, appliedMap); err != nil {
+		if err = r.applyPolicyToPod(podEntry, appliedMap); err != nil {
 			return err
 		}
 	}

@@ -9,27 +9,6 @@ const (
 	notFound = "not-found"
 )
 
-type podInfo struct {
-	// this should become a separate type if needed
-	podID        string
-	namespace    string
-	name         string
-	workloadName string
-	workloadType string
-	labels       Labels
-}
-
-type KubeInfo struct {
-	PodID         string
-	PodName       string
-	Namespace     string
-	ContainerName string
-	WorkloadName  string
-	WorkloadType  string
-	ContainerID   string
-	Labels        Labels
-}
-
 var (
 	// ErrMissingPodUID is returned when no Pod UID could be found for the given cgroup ID.
 	ErrMissingPodUID = errors.New("missing pod UID for cgroup ID")
@@ -39,7 +18,7 @@ var (
 	ErrMissingPodInfo = errors.New("missing pod info for found pod ID")
 )
 
-func (r *Resolver) GetKubeInfo(cgID CgroupID) (*KubeInfo, error) {
+func (r *Resolver) GetContainerView(cgID CgroupID) (*ContainerView, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -55,22 +34,33 @@ func (r *Resolver) GetKubeInfo(cgID CgroupID) (*KubeInfo, error) {
 
 	containerName := notFound
 	containerID := notFound
+	// even if we have the pod in the cache we need to check
+	// we have the container associated with the cgroupID.
 	for cID, info := range pod.containers {
-		if cgID == info.cgID {
-			containerName = info.name
+		if cgID == info.CgroupID {
+			containerName = info.Name
 			containerID = cID
 			break
 		}
 	}
 
-	return &KubeInfo{
-		PodID:         podID,
-		PodName:       pod.info.name,
-		Namespace:     pod.info.namespace,
-		ContainerName: containerName,
-		WorkloadName:  pod.info.workloadName,
-		WorkloadType:  pod.info.workloadType,
-		ContainerID:   containerID,
-		Labels:        pod.info.labels,
+	return &ContainerView{
+		PodMeta: *pod.meta,
+		Meta: ContainerMeta{
+			ID:       containerID,
+			Name:     containerName,
+			CgroupID: cgID,
+		},
 	}, nil
+}
+
+func (r *Resolver) PodCacheSnapshot() map[PodID]PodView {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	snapshot := make(map[PodID]PodView, len(r.podCache))
+	for podID, entry := range r.podCache {
+		snapshot[podID] = entry.toView()
+	}
+	return snapshot
 }

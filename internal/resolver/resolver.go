@@ -9,18 +9,13 @@ import (
 	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 )
 
-type CgroupID = uint64
-type ContainerID = string
-type PodID = string
-type ContainerName = string
-
 type Resolver struct {
 	// let's see if we can split this unique lock in multiple locks later
 	mu              sync.Mutex
 	logger          *slog.Logger
 	nriSynchronized atomic.Bool
 	// todo!: we should add a cache with deleted pods/containers so that we can resolve also recently deleted ones
-	podCache        map[PodID]*podState
+	podCache        map[PodID]*podEntry
 	cgroupIDToPodID map[CgroupID]PodID
 
 	nextPolicyID                PolicyID
@@ -40,7 +35,7 @@ func NewResolver(
 ) (*Resolver, error) {
 	r := &Resolver{
 		logger:                      logger.With("component", "resolver"),
-		podCache:                    make(map[PodID]*podState),
+		podCache:                    make(map[PodID]*podEntry),
 		cgroupIDToPodID:             make(map[CgroupID]PodID),
 		cgTrackerUpdateFunc:         cgTrackerUpdateFunc,
 		cgroupToPolicyMapUpdateFunc: cgroupToPolicyMapUpdateFunc,
