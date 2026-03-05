@@ -56,7 +56,7 @@ func (es *EventScraper) getKubeProcessInfo(event *bpf.ProcessEvent) *KubeProcess
 	containerView, err := es.resolver.GetContainerView(event.CgTrackerID)
 	if err != nil {
 		es.logger.Error("failed to get pod info",
-			"cgID", event.CgTrackerID,
+			"cgTrackerID", event.CgTrackerID,
 			"exe", event.ExePath,
 			"error", err)
 		return nil
