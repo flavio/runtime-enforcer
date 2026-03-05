@@ -61,7 +61,7 @@ Follow these simple steps from your local machine to get Runtime-Enforcer up and
 
 === Install the Helm chart
 
-Runtime-Enforcer ships with a standalone OTEL collector Deployment that handles violation metrics and trace forwarding.
+Runtime-Enforcer ships with a standalone OTEL collector Deployment that handles violation metrics and events forwarding.
 No external OpenTelemetry Collector is needed for a basic setup.
 
 ```bash
@@ -70,8 +70,8 @@ helm repo update
 helm install runtime-enforcer runtime-enforcer/runtime-enforcer \
   --namespace runtime-enforcer \
   --create-namespace \
-  --set operator.manager.image.tag=latest \
-  --set agent.agent.image.tag=latest \
+  --set operator.image.tag=latest \
+  --set agent.image.tag=latest \
   --wait
 ```
 
@@ -280,7 +280,6 @@ Status:
     executablePath: /usr/bin/ps
     nodeName: node-1
     action: monitor
-    count: 1
 ```
 
 [NOTE]
