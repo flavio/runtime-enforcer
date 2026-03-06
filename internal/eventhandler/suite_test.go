@@ -1,4 +1,4 @@
-package agenthandler_test
+package eventhandler_test
 
 import (
 	"context"

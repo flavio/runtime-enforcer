@@ -1,4 +1,4 @@
-package agenthandler
+package workloadpolicyhandler
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/resolver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -63,7 +64,12 @@ func (r *WorkloadPolicyHandler) Reconcile(
 	if err = r.Get(ctx, req.NamespacedName, &wp); err != nil {
 		if errors.IsNotFound(err) {
 			// The item has been removed.
-			if err = r.resolver.HandleWPDelete(&wp); err != nil {
+			if err = r.resolver.HandleWPDelete(&v1alpha1.WorkloadPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      req.Name,
+					Namespace: req.Namespace,
+				},
+			}); err != nil {
 				return ctrl.Result{}, fmt.Errorf(
 					"failed to delete WorkloadPolicy '%s/%s': %w",
 					req.Namespace,

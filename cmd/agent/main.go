@@ -14,13 +14,14 @@ import (
 	"github.com/go-logr/logr"
 
 	securityv1alpha1 "github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
-	"github.com/rancher-sandbox/runtime-enforcer/internal/agenthandler"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/bpf"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/eventhandler"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/events"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/eventscraper"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/grpcexporter"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/nri"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/resolver"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/workloadpolicyhandler"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -86,7 +87,7 @@ func setupWorkloadPolicyHandler(
 	logger *slog.Logger,
 	resolver *resolver.Resolver,
 ) error {
-	wpHandler := agenthandler.NewWorkloadPolicyHandler(ctrlMgr.GetClient(), logger, resolver)
+	wpHandler := workloadpolicyhandler.NewWorkloadPolicyHandler(ctrlMgr.GetClient(), logger, resolver)
 	err := wpHandler.SetupWithManager(ctrlMgr)
 	if err != nil {
 		return fmt.Errorf("unable to set up WorkloadPolicy handler: %w", err)
@@ -130,7 +131,7 @@ func setupLearningReconciler(
 		nsSelector = selector
 	}
 
-	learningReconciler := agenthandler.NewLearningReconciler(ctrlMgr.GetClient(), nsSelector)
+	learningReconciler := eventhandler.NewLearningReconciler(ctrlMgr.GetClient(), nsSelector)
 	if err := learningReconciler.SetupWithManager(ctrlMgr); err != nil {
 		return nil, fmt.Errorf("unable to create learning reconciler: %w", err)
 	}

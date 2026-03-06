@@ -115,7 +115,7 @@
         "subresource",
         "externalversions",
         "workqueue",
-        "agenthandler",
+        "workloadpolicyhandler",
         "rawtime",
         "exepath",
         "pexepath"

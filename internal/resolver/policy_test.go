@@ -38,7 +38,7 @@ func mockCgroupToPolicyMapUpdateFunc(_ PolicyID, _ []CgroupID, _ bpf.CgroupPolic
 }
 
 type testWriter struct {
-	t *testing.T
+	t testing.TB
 }
 
 func (w testWriter) Write(p []byte) (int, error) {
@@ -47,7 +47,7 @@ func (w testWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func newTestResolver(t *testing.T) *Resolver {
+func newTestResolver(t testing.TB) *Resolver {
 	t.Helper()
 	r, err := NewResolver(
 		slog.New(slog.NewJSONHandler(testWriter{t}, nil)),
