@@ -25,6 +25,8 @@ const (
 	// at the moment `third_party/helm` doesn't expose a way to check helm errors.
 	helmRepoNotFoundString  = "no repo named"
 	helmRepoReleaseNotFound = "release: not found"
+	// this is possible when helm has no repositories in its index. We hit this in our e2e tests.
+	helmNoRepositoriesConfigured = "no repositories configured"
 
 	runtimeEnforcerE2EPrefix    = "run-enf-e2e-"
 	runtimeEnforcerNamespace    = runtimeEnforcerE2EPrefix + "runtime-enforcer"
@@ -176,7 +178,9 @@ func uninstallHelmRepos(charts []helmChart) env.Func {
 				"repo", chart.repoLocalName,
 			)
 			err = manager.RunRepo(helm.WithArgs("remove", chart.repoLocalName))
-			if err != nil && !strings.Contains(err.Error(), helmRepoNotFoundString) {
+			if err != nil &&
+				!strings.Contains(err.Error(), helmRepoNotFoundString) &&
+				!strings.Contains(err.Error(), helmNoRepositoriesConfigured) {
 				logger.Warn("failed to remove helm repo",
 					"repo", chart.repoLocalName,
 					"error", err)
