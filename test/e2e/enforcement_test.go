@@ -94,14 +94,20 @@ func getEnforcementOnExistingPodsTest() types.Feature {
 						},
 					}
 
-					// 1. Deploy test pods
-					err := decoder.ApplyWithManifestDir(
+					// 1. Create the resource and wait for it to be deployed.
+					err := r.Create(ctx, &policy)
+					require.NoError(t, err, "create policy")
+
+					waitForWorkloadPolicyStatusToBeUpdated(ctx, t, policy.DeepCopy())
+
+					// 2. Deploy test pods
+					err = decoder.ApplyWithManifestDir(
 						ctx,
 						r,
 						"./testdata",
 						"ubuntu-deployment.yaml",
 						[]resources.CreateOption{},
-						decoder.MutateNamespace(workloadNamespace),
+						getDeploymentPolicyMutateOption(workloadNamespace, "test-policy"),
 					)
 					require.NoError(t, err, "failed to apply test data")
 
@@ -111,12 +117,6 @@ func getEnforcementOnExistingPodsTest() types.Feature {
 					)
 
 					require.NoError(t, err, "failed to wait the target deployment")
-
-					// 2. Create the resource and wait for it to be deployed.
-					err = r.Create(ctx, &policy)
-					require.NoError(t, err, "create policy")
-
-					waitForWorkloadPolicyStatusToBeUpdated(ctx, t, policy.DeepCopy())
 
 					// 3. Run command in the pod and verify the result.
 					var podName string
@@ -232,7 +232,7 @@ func getEnforcementOnNewPodsTest() types.Feature {
 						"./testdata",
 						"ubuntu-deployment.yaml",
 						[]resources.CreateOption{},
-						decoder.MutateNamespace(workloadNamespace),
+						getDeploymentPolicyMutateOption(workloadNamespace, "test-policy"),
 					)
 					require.NoError(t, err, "failed to apply test data")
 
