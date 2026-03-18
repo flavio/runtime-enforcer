@@ -1,30 +1,20 @@
 package bpf
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 )
 
-// createShebangScript creates a temporary executable script with the
-// given shebang line and returns its path.
-func createShebangScript(t *testing.T, interpreter string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "test.sh")
-	require.NoError(t, os.WriteFile(path, []byte("#!"+interpreter+"\n"), 0755), "failed to write shebang script")
-	return path
-}
-
 func TestShebangScript(t *testing.T) {
 	runner, err := newCgroupRunner(t)
 	require.NoError(t, err, "Failed to create cgroup runner")
 	defer runner.close()
 
-	const interpreter = "/usr/bin/true"
-	scriptPath := createShebangScript(t, interpreter)
+	scriptPath, remove, err := generateScriptWithLen(3)
+	require.NoError(t, err, "failed to generate temporary script")
+	defer remove()
 
 	// When a shebang script is executed, the LSM hook fires for
 	// the script but not for the interpreter.
