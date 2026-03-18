@@ -19,6 +19,8 @@ type ProposalWebhook struct {
 	Client client.Client
 }
 
+var _ apierrors.APIStatus = (*ProposalValidatorError)(nil)
+
 type ProposalValidatorError struct {
 	status metav1.Status
 }
