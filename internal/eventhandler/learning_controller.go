@@ -2,9 +2,12 @@ package eventhandler
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/go-logr/logr"
 	securityv1alpha1 "github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/eventscraper"
 	"go.opentelemetry.io/otel"
@@ -99,6 +102,41 @@ func NewLearningReconciler(
 	}
 }
 
+// handleAdmissionError deals with the errors returned by our mutating webhook.
+func (r *LearningReconciler) handleAdmissionError(logger logr.Logger, err error) error {
+	var apistatus apierrors.APIStatus
+	if !errors.As(err, &apistatus) {
+		return err
+	}
+
+	switch apistatus.Status().Code {
+	case http.StatusUnprocessableEntity:
+		// The item is rejected by the webhook.
+		// This means something seriously wrong with the request and we should stop retrying.
+		logger.Error(
+			err,
+			"Failed to update WorkloadPolicyProposal because the proposal is rejected by the webhook",
+		)
+		return nil
+	case http.StatusGone:
+		// This happens when the top-level workload is deleted.
+		// We don't need to retry anymore.
+		logger.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
+			"Failed to update WorkloadPolicyProposal because the proposal is rejected by the webhook",
+		)
+		return nil
+	case http.StatusForbidden:
+		// This happens when the admission webhook rejects the request normally without specifying a special error code.
+		return err
+	default:
+		return fmt.Errorf(
+			"error code %d received when running CreateOrUpdate: %w",
+			apistatus.Status().Code,
+			err,
+		)
+	}
+}
+
 // kubebuilder annotations for accessing policy proposals and namespaces.
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.rancher.io,resources=workloadpolicyproposals,verbs=create;get;list;watch;update;patch
@@ -108,9 +146,14 @@ func (r *LearningReconciler) Reconcile(
 	ctx context.Context,
 	req eventscraper.KubeProcessInfo,
 ) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues(
+		"namespace", req.Namespace,
+		"workload", req.Workload,
+		"workload_kind", req.WorkloadKind,
+		"exe", req.ExecutablePath,
+	)
 
-	log.V(3).Info("Reconciling", "req", req) //nolint:mnd // 3 is the verbosity level for detailed debug info
+	logger.V(3).Info("Reconciling", "req", req) //nolint:mnd // 3 is the verbosity level for detailed debug info
 
 	var err error
 	var proposalName string
@@ -118,11 +161,8 @@ func (r *LearningReconciler) Reconcile(
 	if req.WorkloadKind == "Pod" {
 		// We don't support learning on standalone pods
 
-		log.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
+		logger.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
 			"Ignoring learning event",
-			"workload", req.Workload,
-			"workload_kind", req.WorkloadKind,
-			"exe", req.ExecutablePath,
 		)
 
 		return ctrl.Result{}, nil
@@ -132,16 +172,15 @@ func (r *LearningReconciler) Reconcile(
 		var ns corev1.Namespace
 		if err = r.Client.Get(ctx, types.NamespacedName{Name: req.Namespace}, &ns); err != nil {
 			if apierrors.IsNotFound(err) {
-				log.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
+				logger.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
 					"Namespace not found while evaluating learning namespace selector",
-					"namespace", req.Namespace,
 				)
 				return ctrl.Result{}, nil
 			}
 			return ctrl.Result{}, fmt.Errorf("failed to get namespace %s: %w", req.Namespace, err)
 		}
 		if !r.namespaceSelector.Matches(labels.Set(ns.GetLabels())) {
-			log.V(1).
+			logger.V(1).
 				Info("Namespace does not match learning namespace selector; skipping event", "namespace", req.Namespace)
 			return ctrl.Result{}, nil
 		}
@@ -183,7 +222,7 @@ func (r *LearningReconciler) Reconcile(
 		r.OwnerRefEnricher(policyProposal, req.WorkloadKind, req.Workload)
 		return nil
 	}); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to run CreateOrUpdate: %w", err)
+		return ctrl.Result{}, r.handleAdmissionError(logger, err)
 	}
 
 	// Emit trace when a new process is learned.
