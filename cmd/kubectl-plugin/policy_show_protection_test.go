@@ -1,0 +1,216 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+
+	apiv1alpha1 "github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/workloadkind"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	podTemplateHashLabel = "pod-template-hash"
+	policyName           = "test-policy"
+)
+
+func TestValidatePolicyShowProtectionOutput(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	require.NoError(t, renderPolicyProtection(policyShowProtectionOutputTable, &out, nil))
+	require.NoError(t, renderPolicyProtection(policyShowProtectionOutputJSON, &out, nil))
+	require.Error(t, renderPolicyProtection("yaml", &out, nil))
+}
+
+func TestBuildWorkloadProtectionRows(t *testing.T) {
+	t.Parallel()
+
+	namespaceA := "ns-a"
+	namespaceB := "ns-b"
+
+	tests := []struct {
+		name     string
+		pods     []corev1.Pod
+		policies []apiv1alpha1.WorkloadPolicy
+		expected []workloadProtectionRow
+	}{
+		{
+			name: "group deployment pods into one workload row",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ubuntu-deployment-6469c647b5-2ftx7",
+						Namespace: namespaceA,
+						Labels: map[string]string{
+							apiv1alpha1.PolicyLabelKey: policyName,
+							podTemplateHashLabel:       "6469c647b5",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ubuntu-deployment-6469c647b5-tjssz",
+						Namespace: namespaceA,
+						Labels: map[string]string{
+							apiv1alpha1.PolicyLabelKey: policyName,
+							podTemplateHashLabel:       "6469c647b5",
+						},
+					},
+				},
+			},
+			policies: []apiv1alpha1.WorkloadPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: policyName, Namespace: namespaceA},
+					Spec:       apiv1alpha1.WorkloadPolicySpec{Mode: policymode.ProtectString},
+					Status:     apiv1alpha1.WorkloadPolicyStatus{Phase: apiv1alpha1.Active},
+				},
+			},
+			expected: []workloadProtectionRow{
+				{
+					Workload: types.NamespacedName{Namespace: namespaceA, Name: "ubuntu-deployment"}.String(),
+					Kind:     workloadkind.Deployment.String(),
+					Policy:   policyName,
+					Mode:     modeToUpper(policymode.ProtectString),
+					Status:   string(apiv1alpha1.Active),
+				},
+			},
+		},
+		{
+			name: "missing policy uses unknown mode and missing status",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ubuntu-deployment-6469c647b5-2ftx7",
+						Namespace: namespaceA,
+						Labels: map[string]string{
+							apiv1alpha1.PolicyLabelKey: policyName,
+							podTemplateHashLabel:       "6469c647b5",
+						},
+					},
+				},
+			},
+			policies: nil,
+			expected: []workloadProtectionRow{
+				{
+					Workload: types.NamespacedName{Namespace: namespaceA, Name: "ubuntu-deployment"}.String(),
+					Kind:     workloadkind.Deployment.String(),
+					Policy:   policyName,
+					Mode:     unknownMode,
+					Status:   missingStatus,
+				},
+			},
+		},
+		{
+			name: "same policy name in different namespaces respects namespace",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod-a",
+						Namespace: namespaceA,
+						Labels: map[string]string{
+							apiv1alpha1.PolicyLabelKey: policyName,
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod-b",
+						Namespace: namespaceB,
+						Labels: map[string]string{
+							apiv1alpha1.PolicyLabelKey: policyName,
+						},
+					},
+				},
+			},
+			policies: []apiv1alpha1.WorkloadPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: policyName, Namespace: namespaceA},
+					Spec:       apiv1alpha1.WorkloadPolicySpec{Mode: policymode.MonitorString},
+					Status:     apiv1alpha1.WorkloadPolicyStatus{Phase: apiv1alpha1.Active},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: policyName, Namespace: namespaceB},
+					Spec:       apiv1alpha1.WorkloadPolicySpec{Mode: policymode.ProtectString},
+					Status:     apiv1alpha1.WorkloadPolicyStatus{Phase: apiv1alpha1.Failed},
+				},
+			},
+			expected: []workloadProtectionRow{
+				{
+					Workload: types.NamespacedName{Namespace: namespaceA, Name: "pod-a"}.String(),
+					Kind:     workloadkind.Pod.String(),
+					Policy:   policyName,
+					Mode:     modeToUpper(policymode.MonitorString),
+					Status:   string(apiv1alpha1.Active),
+				},
+				{
+					Workload: types.NamespacedName{Namespace: namespaceB, Name: "pod-b"}.String(),
+					Kind:     workloadkind.Pod.String(),
+					Policy:   policyName,
+					Mode:     modeToUpper(policymode.ProtectString),
+					Status:   string(apiv1alpha1.Failed),
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rows := buildWorkloadProtectionRows(tc.pods, tc.policies)
+			require.Equal(t, tc.expected, rows)
+		})
+	}
+}
+
+func TestRenderPolicyProtection(t *testing.T) {
+	t.Parallel()
+
+	workloadName := "ns-a/ubuntu-deployment"
+	rows := []workloadProtectionRow{{
+		Workload: workloadName,
+		Kind:     workloadkind.Deployment.String(),
+		Policy:   policyName,
+		Mode:     modeToUpper(policymode.ProtectString),
+		Status:   string(apiv1alpha1.Active),
+	}}
+
+	t.Run("validate json", func(t *testing.T) {
+		t.Parallel()
+		var out bytes.Buffer
+		err := renderPolicyProtectionJSON(&out, rows)
+		require.NoError(t, err)
+
+		var decoded []map[string]any
+		require.NoError(t, json.Unmarshal(out.Bytes(), &decoded))
+		require.Len(t, decoded, 1)
+		require.Equal(t, workloadName, decoded[0]["workload"])
+		require.Equal(t, policyName, decoded[0]["policy"])
+		require.Equal(t, workloadkind.Deployment.String(), decoded[0]["kind"])
+		require.Equal(t, modeToUpper(policymode.ProtectString), decoded[0]["mode"])
+		require.Equal(t, string(apiv1alpha1.Active), decoded[0]["status"])
+	})
+
+	t.Run("validate table", func(t *testing.T) {
+		t.Parallel()
+		var out bytes.Buffer
+		err := renderPolicyProtectionTable(&out, rows)
+		require.NoError(t, err)
+
+		output := out.String()
+		require.Contains(t, output, "WORKLOAD")
+		require.Contains(t, output, "KIND")
+		require.Contains(t, output, "POLICY")
+		require.Contains(t, output, "MODE")
+		require.Contains(t, output, "STATUS")
+		require.Contains(t, output, workloadName)
+		require.Contains(t, output, policyName)
+		require.Contains(t, output, workloadkind.Deployment.String())
+		require.Contains(t, output, modeToUpper(policymode.ProtectString))
+		require.Contains(t, output, string(apiv1alpha1.Active))
+	})
+}
