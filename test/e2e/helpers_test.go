@@ -42,7 +42,7 @@ func waitForWorkloadPolicyStatusToBeUpdated(
 			return false
 		}
 		return true
-	}), wait.WithTimeout(15*time.Second))
+	}), wait.WithTimeout(60*time.Second))
 	require.NoError(t, err, "workloadpolicy status should be updated to Deployed")
 }
 

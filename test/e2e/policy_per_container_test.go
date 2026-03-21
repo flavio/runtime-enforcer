@@ -20,7 +20,7 @@ import (
 )
 
 func getPolicyPerContainerTest() types.Feature {
-	workloadNamespace := envconf.RandomName("policy-per-container-namespace", 32)
+	workloadNamespace := envconf.RandomName("policy-per-container-ns", 32)
 	policyName := "per-container-policy"
 	podNameAllowed := "test-pod-allowed-init-main"
 	podNameBlocked := "test-pod-blocked-init-main"

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	agentClientTimeout = 5 * time.Second
+	agentClientTimeout = 30 * time.Second
 )
 
 // AgentClientAPI this interface could be used to mock clients in tests.
