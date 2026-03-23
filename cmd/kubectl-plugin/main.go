@@ -25,6 +25,29 @@ Flags:
 `
 )
 
+func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory) {
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"namespace",
+		func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"context",
+		func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster",
+		func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"user",
+		func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+}
+
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "runtime-enforcer",
@@ -46,6 +69,8 @@ func newRootCmd() *cobra.Command {
 	f := cmdutil.NewFactory(configFlags)
 
 	utilcomp.SetFactoryForCompletion(f)
+
+	registerCompletionFuncForGlobalFlags(cmd, f)
 
 	cmd.AddCommand(newProposalCmd(f))
 	cmd.AddCommand(newPolicyCmd(f))
