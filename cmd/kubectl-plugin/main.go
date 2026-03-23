@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
@@ -61,19 +62,22 @@ func newRootCmd() *cobra.Command {
 
 	cmd.SetUsageTemplate(rootUsageTemplate)
 
-	opts := newCommonOptions()
+	// Create a shared iostream.
+	streams := genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
-	configFlags := genericclioptions.NewConfigFlags(true).WithWarningPrinter(opts.ioStreams)
+	// Add flags to persistent flags so they are inherited by all subcommands
+	configFlags := genericclioptions.NewConfigFlags(true).WithWarningPrinter(streams)
 	configFlags.AddFlags(cmd.PersistentFlags())
 
+	// Create cmdutil.Factory for use in completion functions
 	f := cmdutil.NewFactory(configFlags)
-
 	utilcomp.SetFactoryForCompletion(f)
 
+	// Register completion functions, so we can auto-complete global flags like --namespace, --context, etc.
 	registerCompletionFuncForGlobalFlags(cmd, f)
 
-	cmd.AddCommand(newProposalCmd(f))
-	cmd.AddCommand(newPolicyCmd(f))
+	cmd.AddCommand(newProposalCmd(f, streams))
+	cmd.AddCommand(newPolicyCmd(f, streams))
 
 	return cmd
 }

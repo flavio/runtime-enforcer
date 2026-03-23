@@ -16,8 +16,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (
@@ -43,9 +45,9 @@ type workloadProtectionRow struct {
 	Status   string `json:"status"`
 }
 
-func newPolicyShowProtectionCmd() *cobra.Command {
+func newPolicyShowProtectionCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	opts := &policyShowProtectionOptions{
-		commonOptions: newCommonOptions(),
+		commonOptions: newCommonOptions(f, streams),
 		Output:        policyShowProtectionOutputTable,
 	}
 
