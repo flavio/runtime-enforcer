@@ -2,10 +2,11 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,7 +39,7 @@ func (r *WorkloadPolicyReconciler) Reconcile(
 ) (ctrl.Result, error) {
 	policy := &v1alpha1.WorkloadPolicy{}
 	if err := r.Get(ctx, req.NamespacedName, policy); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get WorkloadPolicy '%s/%s': %w", req.Namespace, req.Name, err)
@@ -80,7 +81,8 @@ func (r *WorkloadPolicyReconciler) handleDeletion(
 		}
 
 		if len(podList.Items) > 0 {
-			logger.V(1).Info("Cannot remove finalizer: policy still in use by pods",
+			logger.Error(errors.New("cannot remove finalizer"),
+				"policy still in use by pods",
 				"policy", policy.Name,
 				"podCount", len(podList.Items))
 			// Pod deletion will trigger a reconcile, and we'll retry finalizer removal then.
