@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -20,31 +19,20 @@ import (
 )
 
 func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
-	workloadNamespace := envconf.RandomName("vap-test-ns", 32)
-
 	return features.New("Test ValidatingAdmissionPolicy for Pod policy label").
 		Setup(SetupSharedK8sClient).
-		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("creating test namespace")
-			r := ctx.Value(key("client")).(*resources.Resources)
-
-			namespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: workloadNamespace}}
-
-			err := r.Create(ctx, &namespace)
-			assert.NoError(t, err, "failed to create test namespace")
-
-			return ctx
-		}).
+		Setup(SetupTestNamespace).
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("VAP prevents adding policy label to existing pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
+				namespace := getNamespace(ctx)
 
 				// Create a pod without the policy label
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-pod-no-label",
-						Namespace: workloadNamespace,
+						Namespace: namespace,
 						Labels: map[string]string{
 							"app": "test",
 						},
@@ -69,7 +57,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 				)
 				require.NoError(t, err, "pod failed to reach running state")
 				var createdPod corev1.Pod
-				err = r.Get(ctx, "test-pod-no-label", workloadNamespace, &createdPod)
+				err = r.Get(ctx, "test-pod-no-label", namespace, &createdPod)
 				require.NoError(t, err, "failed to get created pod")
 
 				// Try to add the policy label - this should be rejected by VAP
@@ -81,7 +69,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 
 				// Verify the label was not added
 				var updatedPod corev1.Pod
-				err = r.Get(ctx, "test-pod-no-label", workloadNamespace, &updatedPod)
+				err = r.Get(ctx, "test-pod-no-label", namespace, &updatedPod)
 				require.NoError(t, err, "failed to get pod after failed update")
 				_, exists := updatedPod.Labels[v1alpha1.PolicyLabelKey]
 				require.False(t, exists, "policy label should not exist on pod")
@@ -94,13 +82,14 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("VAP prevents removing policy label from existing pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
+				namespace := getNamespace(ctx)
 
 				// Create a pod with the policy label
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-pod-with-label",
-						Namespace: workloadNamespace,
+						Namespace: namespace,
 						Labels: map[string]string{
 							"app":                   "test",
 							v1alpha1.PolicyLabelKey: "test-policy",
@@ -126,7 +115,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 				)
 				require.NoError(t, err, "pod failed to reach running state")
 				var createdPod corev1.Pod
-				err = r.Get(ctx, "test-pod-with-label", workloadNamespace, &createdPod)
+				err = r.Get(ctx, "test-pod-with-label", namespace, &createdPod)
 				require.NoError(t, err, "failed to get created pod")
 
 				// Try to remove the policy label - this should be rejected by VAP
@@ -138,7 +127,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 
 				// Verify the label still exists
 				var updatedPod corev1.Pod
-				err = r.Get(ctx, "test-pod-with-label", workloadNamespace, &updatedPod)
+				err = r.Get(ctx, "test-pod-with-label", namespace, &updatedPod)
 				require.NoError(t, err, "failed to get pod after failed update")
 				labelValue, exists := updatedPod.Labels[v1alpha1.PolicyLabelKey]
 				require.True(t, exists, "policy label should still exist on pod")
@@ -152,13 +141,14 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("VAP prevents changing policy label value on existing pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
+				namespace := getNamespace(ctx)
 
 				// Create a pod with the policy label
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-pod-change-label",
-						Namespace: workloadNamespace,
+						Namespace: namespace,
 						Labels: map[string]string{
 							"app":                   "test",
 							v1alpha1.PolicyLabelKey: "original-policy",
@@ -184,7 +174,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 				)
 				require.NoError(t, err, "pod failed to reach running state")
 				var createdPod corev1.Pod
-				err = r.Get(ctx, "test-pod-change-label", workloadNamespace, &createdPod)
+				err = r.Get(ctx, "test-pod-change-label", namespace, &createdPod)
 				require.NoError(t, err, "failed to get created pod")
 
 				// Try to change the policy label value - this should be rejected by VAP
@@ -196,7 +186,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 
 				// Verify the label value was not changed
 				var updatedPod corev1.Pod
-				err = r.Get(ctx, "test-pod-change-label", workloadNamespace, &updatedPod)
+				err = r.Get(ctx, "test-pod-change-label", namespace, &updatedPod)
 				require.NoError(t, err, "failed to get pod after failed update")
 				labelValue, exists := updatedPod.Labels[v1alpha1.PolicyLabelKey]
 				require.True(t, exists, "policy label should still exist on pod")
@@ -210,13 +200,14 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("Updating other Pod fields should be allowed when policy label exists",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
+				namespace := getNamespace(ctx)
 
 				// Create a pod with the policy label
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-pod-with-label-update-fields",
-						Namespace: workloadNamespace,
+						Namespace: namespace,
 						Labels: map[string]string{
 							"app":                   "test",
 							v1alpha1.PolicyLabelKey: "test-policy",
@@ -242,7 +233,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 				)
 				require.NoError(t, err, "pod failed to reach running state")
 				var createdPod corev1.Pod
-				err = r.Get(ctx, "test-pod-with-label-update-fields", workloadNamespace, &createdPod)
+				err = r.Get(ctx, "test-pod-with-label-update-fields", namespace, &createdPod)
 				require.NoError(t, err, "failed to get created pod")
 
 				// Update other pod fields - this should be allowed
@@ -256,7 +247,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 
 				// Verify the policy label is unchanged
 				var updatedPod corev1.Pod
-				err = r.Get(ctx, "test-pod-with-label-update-fields", workloadNamespace, &updatedPod)
+				err = r.Get(ctx, "test-pod-with-label-update-fields", namespace, &updatedPod)
 				require.NoError(t, err, "failed to get pod after update")
 				labelValue, exists := updatedPod.Labels[v1alpha1.PolicyLabelKey]
 				require.True(t, exists, "policy label should still exist on pod")
@@ -282,13 +273,14 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("Updating other Pod fields should be allowed when policy label does not exist",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
+				namespace := getNamespace(ctx)
 
 				// Create a pod without the policy label
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-pod-no-label-update-fields",
-						Namespace: workloadNamespace,
+						Namespace: namespace,
 						Labels: map[string]string{
 							"app": "test",
 						},
@@ -313,7 +305,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 				)
 				require.NoError(t, err, "pod failed to reach running state")
 				var createdPod corev1.Pod
-				err = r.Get(ctx, "test-pod-no-label-update-fields", workloadNamespace, &createdPod)
+				err = r.Get(ctx, "test-pod-no-label-update-fields", namespace, &createdPod)
 				require.NoError(t, err, "failed to get created pod")
 
 				// Update other pod fields - this should be allowed
@@ -328,7 +320,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 
 				// Verify the pod was updated and policy label still doesn't exist
 				var updatedPod corev1.Pod
-				err = r.Get(ctx, "test-pod-no-label-update-fields", workloadNamespace, &updatedPod)
+				err = r.Get(ctx, "test-pod-no-label-update-fields", namespace, &updatedPod)
 				require.NoError(t, err, "failed to get pod after update")
 				_, exists := updatedPod.Labels[v1alpha1.PolicyLabelKey]
 				require.False(t, exists, "policy label should not exist on pod")
@@ -353,11 +345,11 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("cleaning up test namespace")
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			// Clean up any remaining pods
 			var pods corev1.PodList
-			err := r.WithNamespace(workloadNamespace).List(ctx, &pods)
+			err := r.WithNamespace(getNamespace(ctx)).List(ctx, &pods)
 			if err == nil {
 				for _, pod := range pods.Items {
 					if strings.HasPrefix(pod.Name, "test-pod-") {
@@ -366,7 +358,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 				}
 			}
 
-			namespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: workloadNamespace}}
+			namespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: getNamespace(ctx)}}
 			err = r.Delete(ctx, &namespace)
 			assert.NoError(t, err, "failed to delete test namespace")
 

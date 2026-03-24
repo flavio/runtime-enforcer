@@ -1,19 +1,13 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -22,47 +16,22 @@ import (
 )
 
 func getPromotionTest() types.Feature {
-	workloadNamespace := envconf.RandomName("main-namespace", 32)
-
 	return features.New("Promotion").
 		Setup(SetupSharedK8sClient).
+		Setup(SetupTestNamespace).
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("creating test namespace")
-			r := ctx.Value(key("client")).(*resources.Resources)
-
-			namespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: workloadNamespace}}
-
-			err := r.Create(ctx, &namespace)
-			assert.NoError(t, err, "failed to create test namespace")
-
-			return ctx
-		}).
-		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("installing test Ubuntu deployment")
-
-			r := ctx.Value(key("client")).(*resources.Resources)
-
-			err := decoder.ApplyWithManifestDir(
-				ctx,
-				r,
-				"./testdata",
-				"ubuntu-deployment.yaml",
-				[]resources.CreateOption{},
-				decoder.MutateNamespace(workloadNamespace),
-			)
-			assert.NoError(t, err, "failed to apply test data")
-
+			createAndWaitUbuntuDeployment(ctx, t)
 			return ctx
 		}).
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("the workload proposal is created successfully for the ubuntu pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				proposal := v1alpha1.WorkloadPolicyProposal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "deploy-ubuntu-deployment",
-						Namespace: workloadNamespace, // to be consistent with test data.
+						Namespace: getNamespace(ctx),
 					},
 				}
 				err := wait.For(conditions.New(r).ResourceMatch(
@@ -84,14 +53,14 @@ func getPromotionTest() types.Feature {
 		Assess("the running process is learned",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				id := ctx.Value(key("group")).(string)
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				t.Log("waiting for policy proposal to be created: ", id)
 
 				proposal := v1alpha1.WorkloadPolicyProposal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      id,
-						Namespace: workloadNamespace, // to be consistent with test data.
+						Namespace: getNamespace(ctx),
 					},
 				}
 
@@ -121,7 +90,7 @@ func getPromotionTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("create a policy")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				proposal := ctx.Value(key("proposal")).(*v1alpha1.WorkloadPolicyProposal)
 
 				t.Log("applying the label to the policy proposal: ", proposal.Name, v1alpha1.ApprovalLabelKey)
@@ -165,31 +134,17 @@ func getPromotionTest() types.Feature {
 			}).
 		Assess("pod exec will not be blocked since the policy is in monitoring mode",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
-
-				var podName string
-				var pods corev1.PodList
-				err := r.WithNamespace(workloadNamespace).List(ctx, &pods)
+				podName, err := findUbuntuDeploymentPod(ctx)
 				require.NoError(t, err)
 
-				for _, v := range pods.Items {
-					if strings.HasPrefix(v.Name, "ubuntu-deployment") {
-						podName = v.Name
-						break
-					}
-				}
-
-				var stdout, stderr bytes.Buffer
-
-				err = r.ExecInPod(ctx, workloadNamespace, podName, "ubuntu", []string{"mkdir"}, &stdout, &stderr)
-				require.Error(t, err)
-				require.Empty(t, stdout.String())
-				require.Equal(t, "mkdir: missing operand\nTry 'mkdir --help' for more information.\n", stderr.String())
+				stdout, stderr := requireExecFailsInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
+				require.Empty(t, stdout)
+				require.Equal(t, "mkdir: missing operand\nTry 'mkdir --help' for more information.\n", stderr)
 
 				return ctx
 			}).
 		Assess("delete policy", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			policy := ctx.Value(key("policy")).(*v1alpha1.WorkloadPolicy)
 			proposal := ctx.Value(key("proposal")).(*v1alpha1.WorkloadPolicyProposal)
 
@@ -202,20 +157,7 @@ func getPromotionTest() types.Feature {
 			return ctx
 		}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("uninstalling test resources")
-
-			r := ctx.Value(key("client")).(*resources.Resources)
-
-			err := decoder.DeleteWithManifestDir(
-				ctx,
-				r,
-				"./testdata",
-				"ubuntu-deployment.yaml",
-				[]resources.DeleteOption{},
-				decoder.MutateNamespace(workloadNamespace),
-			)
-			assert.NoError(t, err, "failed to delete test data")
-
+			deleteUbuntuDeployment(ctx, t)
 			return ctx
 		}).Feature()
 }

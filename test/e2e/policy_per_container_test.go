@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -11,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -20,33 +18,18 @@ import (
 )
 
 func getPolicyPerContainerTest() types.Feature {
-	workloadNamespace := envconf.RandomName("policy-per-container-ns", 32)
 	policyName := "per-container-policy"
 	podNameAllowed := "test-pod-allowed-init-main"
 	podNameBlocked := "test-pod-blocked-init-main"
 
 	return features.New("policy per container").
 		Setup(SetupSharedK8sClient).
+		Setup(SetupTestNamespace).
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("creating test namespace")
-			r := ctx.Value(key("client")).(*resources.Resources)
-
-			namespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: workloadNamespace}}
-
-			err := r.Create(ctx, &namespace)
-			require.NoError(t, err, "failed to create test namespace")
-
-			return ctx
-		}).
-		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("creating workload policy with per-container rules")
-
-			r := ctx.Value(key("client")).(*resources.Resources)
-
 			policy := v1alpha1.WorkloadPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      policyName,
-					Namespace: workloadNamespace,
+					Namespace: getNamespace(ctx),
 				},
 				Spec: v1alpha1.WorkloadPolicySpec{
 					Mode: "protect",
@@ -69,12 +52,7 @@ func getPolicyPerContainerTest() types.Feature {
 					},
 				},
 			}
-
-			err := r.Create(ctx, &policy)
-			require.NoError(t, err, "failed to create workload policy")
-
-			waitForWorkloadPolicyStatusToBeUpdated(ctx, t, policy.DeepCopy())
-
+			createAndWaitWP(ctx, t, policy.DeepCopy())
 			return ctx
 		}).
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
@@ -82,12 +60,12 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("creating pod where init container runs allowed command (echo)")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      podNameAllowed,
-						Namespace: workloadNamespace,
+						Namespace: getNamespace(ctx),
 						Labels: map[string]string{
 							v1alpha1.PolicyLabelKey: policyName,
 						},
@@ -120,7 +98,7 @@ func getPolicyPerContainerTest() types.Feature {
 				)
 				require.NoError(t, err, "pod did not become ready")
 
-				err = r.Get(ctx, podNameAllowed, workloadNamespace, &pod)
+				err = r.Get(ctx, podNameAllowed, getNamespace(ctx), &pod)
 				require.NoError(t, err, "failed to get pod")
 
 				// Verify init container completed successfully (echo is allowed)
@@ -144,12 +122,12 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("creating pod where init container runs blocked command (date)")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				blockedPod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      podNameBlocked,
-						Namespace: workloadNamespace,
+						Namespace: getNamespace(ctx),
 						Labels: map[string]string{
 							v1alpha1.PolicyLabelKey: policyName,
 						},
@@ -211,22 +189,13 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("verifying ls is allowed in main container")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
-
-				var stdout, stderr bytes.Buffer
-
-				err := r.ExecInPod(
+				_, _ = requireExecAllowedInCurrentNamespace(
 					ctx,
-					workloadNamespace,
+					t,
 					podNameAllowed,
 					"main-container",
 					[]string{"ls", "/"},
-					&stdout,
-					&stderr,
 				)
-
-				require.NoError(t, err, "ls execution in main container should be allowed")
-				require.NotEmpty(t, stdout.String(), "ls should produce output")
 
 				return ctx
 			}).
@@ -234,36 +203,25 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("verifying bash is blocked in main container")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
-
-				var stdout, stderr bytes.Buffer
-
-				err := r.ExecInPod(
+				requireExecBlockedInCurrentNamespace(
 					ctx,
-					workloadNamespace,
+					t,
 					podNameAllowed,
 					"main-container",
 					[]string{"bash", "-c", "echo 'bash should be blocked'"},
-					&stdout,
-					&stderr,
 				)
-
-				require.Error(t, err, "bash execution in main container should be blocked")
-				require.Empty(t, stdout.String(), "stdout should be empty when bash is blocked")
-				require.Contains(t, stderr.String(), "operation not permitted",
-					"stderr should contain 'operation not permitted' when bash is blocked")
 
 				return ctx
 			}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("cleaning up test resources")
 
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podNameAllowed,
-					Namespace: workloadNamespace,
+					Namespace: getNamespace(ctx),
 				},
 			}
 			err := r.Delete(ctx, &pod)
@@ -278,11 +236,10 @@ func getPolicyPerContainerTest() types.Feature {
 			policy := v1alpha1.WorkloadPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      policyName,
-					Namespace: workloadNamespace,
+					Namespace: getNamespace(ctx),
 				},
 			}
-			err = r.Delete(ctx, &policy)
-			require.NoError(t, err, "failed to delete workload policy")
+			deleteAndWaitWP(ctx, t, &policy)
 
 			return ctx
 		}).Feature()
