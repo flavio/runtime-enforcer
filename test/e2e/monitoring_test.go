@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -48,9 +47,8 @@ func getMonitoringTest() types.Feature {
 			return context.WithValue(ctx, key("policy"), policy.DeepCopy())
 		}).
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			namespace := getNamespace(ctx)
 			createAndWaitUbuntuDeployment(ctx, t, withPolicy("test-policy"))
-			ubuntuPodName, err := findPodByPrefix(ctx, namespace, "ubuntu-deployment")
+			ubuntuPodName, err := findUbuntuDeploymentPod(ctx)
 			require.NoError(t, err)
 			require.NotEmpty(t, ubuntuPodName)
 			return context.WithValue(ctx, key("targetPodName"), ubuntuPodName)
@@ -58,28 +56,27 @@ func getMonitoringTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("a namespace-scoped policy can monitor behaviors correctly",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				namespace := getNamespace(ctx)
 				expectedPodName := ctx.Value(key("targetPodName")).(string)
 				r := getClient(ctx)
+				var err error
 
 				t.Log("executing allowed command (should not produce violations)")
-				var stdout, stderr bytes.Buffer
-				err := r.ExecInPod(ctx, namespace, expectedPodName, "ubuntu",
-					[]string{"/usr/bin/ls"}, &stdout, &stderr)
-				require.NoError(t, err)
+				requireExecAllowedInCurrentNamespace(ctx, t, expectedPodName, "ubuntu", []string{"/usr/bin/ls"})
 
 				t.Log("executing disallowed command to trigger violation")
-				stdout.Reset()
-				stderr.Reset()
-				err = r.ExecInPod(ctx, namespace, expectedPodName, "ubuntu",
-					[]string{"/usr/bin/sh", "-c", "/usr/bin/apt update"}, &stdout, &stderr)
-				require.NoError(t, err)
+				requireExecAllowedInCurrentNamespace(
+					ctx,
+					t,
+					expectedPodName,
+					"ubuntu",
+					[]string{"/usr/bin/sh", "-c", "/usr/bin/apt update"},
+				)
 
 				t.Log("waiting for violations to appear in WorkloadPolicy status")
 				policyToCheck := &v1alpha1.WorkloadPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-policy",
-						Namespace: namespace,
+						Namespace: getNamespace(ctx),
 					},
 				}
 				err = wait.For(conditions.New(r).ResourceMatch(policyToCheck, func(obj k8s.Object) bool {
@@ -102,7 +99,7 @@ func getMonitoringTest() types.Feature {
 				require.NoError(t, err, "violation for /usr/bin/apt should appear in WorkloadPolicy status")
 
 				t.Log("verifying violation record details")
-				err = r.Get(ctx, "test-policy", namespace, policyToCheck)
+				err = r.Get(ctx, "test-policy", getNamespace(ctx), policyToCheck)
 				require.NoError(t, err)
 				require.NotEmpty(t, policyToCheck.Status.Violations)
 

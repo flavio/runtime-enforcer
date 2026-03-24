@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -190,22 +189,13 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("verifying ls is allowed in main container")
 
-				r := getClient(ctx)
-
-				var stdout, stderr bytes.Buffer
-
-				err := r.ExecInPod(
+				_, _ = requireExecAllowedInCurrentNamespace(
 					ctx,
-					getNamespace(ctx),
+					t,
 					podNameAllowed,
 					"main-container",
 					[]string{"ls", "/"},
-					&stdout,
-					&stderr,
 				)
-
-				require.NoError(t, err, "ls execution in main container should be allowed")
-				require.NotEmpty(t, stdout.String(), "ls should produce output")
 
 				return ctx
 			}).
@@ -213,24 +203,13 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("verifying bash is blocked in main container")
 
-				r := getClient(ctx)
-
-				var stdout, stderr bytes.Buffer
-
-				err := r.ExecInPod(
+				requireExecBlockedInCurrentNamespace(
 					ctx,
-					getNamespace(ctx),
+					t,
 					podNameAllowed,
 					"main-container",
 					[]string{"bash", "-c", "echo 'bash should be blocked'"},
-					&stdout,
-					&stderr,
 				)
-
-				require.Error(t, err, "bash execution in main container should be blocked")
-				require.Empty(t, stdout.String(), "stdout should be empty when bash is blocked")
-				require.Contains(t, stderr.String(), "operation not permitted",
-					"stderr should contain 'operation not permitted' when bash is blocked")
 
 				return ctx
 			}).
@@ -260,8 +239,7 @@ func getPolicyPerContainerTest() types.Feature {
 					Namespace: getNamespace(ctx),
 				},
 			}
-			err = r.Delete(ctx, &policy)
-			require.NoError(t, err, "failed to delete workload policy")
+			deleteAndWaitWP(ctx, t, &policy)
 
 			return ctx
 		}).Feature()

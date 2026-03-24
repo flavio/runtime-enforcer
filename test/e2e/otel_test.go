@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -59,9 +58,8 @@ func getOtelCollectorTest() types.Feature {
 			return context.WithValue(ctx, key("policy"), policy.DeepCopy())
 		}).
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			namespace := getNamespace(ctx)
 			createAndWaitUbuntuDeployment(ctx, t, withPolicy("test-policy"))
-			ubuntuPodName, err := findPodByPrefix(ctx, namespace, "ubuntu-deployment")
+			ubuntuPodName, err := findUbuntuDeploymentPod(ctx)
 			require.NoError(t, err)
 			require.NotEmpty(t, ubuntuPodName)
 			return context.WithValue(ctx, key("targetPodName"), ubuntuPodName)
@@ -85,15 +83,18 @@ func getOtelCollectorTest() types.Feature {
 			}).
 		Assess("violations produce Prometheus metrics on the collector",
 			func(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
-				namespace := getNamespace(ctx)
 				expectedPodName := ctx.Value(key("targetPodName")).(string)
 				r := getClient(ctx)
+				var err error
 
 				t.Log("executing disallowed command to trigger a violation")
-				var stdout, stderr bytes.Buffer
-				err := r.ExecInPod(ctx, namespace, expectedPodName, "ubuntu",
-					[]string{"/usr/bin/sh", "-c", "/usr/bin/apt update"}, &stdout, &stderr)
-				require.NoError(t, err)
+				requireExecAllowedInCurrentNamespace(
+					ctx,
+					t,
+					expectedPodName,
+					"ubuntu",
+					[]string{"/usr/bin/sh", "-c", "/usr/bin/apt update"},
+				)
 
 				// Wait for the violation to appear in WorkloadPolicy status first.
 				// This confirms the gRPC scrape path works and gives the OTEL
@@ -102,7 +103,7 @@ func getOtelCollectorTest() types.Feature {
 				policyToCheck := &v1alpha1.WorkloadPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-policy",
-						Namespace: namespace,
+						Namespace: getNamespace(ctx),
 					},
 				}
 				err = wait.For(conditions.New(r).ResourceMatch(policyToCheck, func(obj k8s.Object) bool {
@@ -157,7 +158,13 @@ func getOtelCollectorTest() types.Feature {
 				// connector configuration.
 				t.Log("validating metric labels")
 				assertMetricHasLabel(t, metricsBody, "runtime_enforcer_violations", "policy_name", "test-policy")
-				assertMetricHasLabel(t, metricsBody, "runtime_enforcer_violations", "k8s_namespace_name", namespace)
+				assertMetricHasLabel(
+					t,
+					metricsBody,
+					"runtime_enforcer_violations",
+					"k8s_namespace_name",
+					getNamespace(ctx),
+				)
 				assertMetricHasLabel(t, metricsBody, "runtime_enforcer_violations", "action", policymode.MonitorString)
 				// node_name is set dynamically; just verify the label is present.
 				assertMetricHasLabelKey(t, metricsBody, "runtime_enforcer_violations", "node_name")
