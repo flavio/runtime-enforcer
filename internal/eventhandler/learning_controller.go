@@ -11,6 +11,7 @@ import (
 	securityv1alpha1 "github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/eventhandler/proposalutils"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/eventscraper"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/loglevel"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,7 +98,7 @@ func (r *LearningReconciler) handleAdmissionError(logger logr.Logger, err error)
 	case http.StatusGone:
 		// This happens when the top-level workload is deleted.
 		// We don't need to retry anymore.
-		logger.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
+		logger.V(loglevel.VerbosityDebug).Info(
 			"Failed to update WorkloadPolicyProposal because the owner workload has been deleted",
 		)
 		return nil
@@ -151,8 +152,7 @@ func (r *LearningReconciler) Reconcile(
 
 		requeueAfter := r.ratelimiter.When(req)
 
-		//nolint:mnd // 3 is the verbosity level for detailed debug info
-		log.V(3).
+		log.V(loglevel.VerbosityDebug).
 			Info("Reconciliation failed due to conflict. Retry with backoff", "req", req, "delay", requeueAfter, "error", err)
 
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
@@ -174,7 +174,7 @@ func (r *LearningReconciler) reconcile(
 		"exe", req.ExecutablePath,
 	)
 
-	logger.V(3).Info("Reconciling", "req", req) //nolint:mnd // 3 is the verbosity level for detailed debug info
+	logger.V(loglevel.VerbosityDebug).Info("Reconciling", "req", req)
 
 	var err error
 	var proposalName string
@@ -182,7 +182,7 @@ func (r *LearningReconciler) reconcile(
 	if req.WorkloadKind == "Pod" {
 		// We don't support learning on standalone pods
 
-		logger.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
+		logger.V(loglevel.VerbosityDebug).Info(
 			"Ignoring learning event",
 		)
 
@@ -193,7 +193,7 @@ func (r *LearningReconciler) reconcile(
 		var ns corev1.Namespace
 		if err = r.Client.Get(ctx, types.NamespacedName{Name: req.Namespace}, &ns); err != nil {
 			if apierrors.IsNotFound(err) {
-				logger.V(3).Info( //nolint:mnd // 3 is the verbosity level for detailed debug info
+				logger.V(loglevel.VerbosityDebug).Info(
 					"Namespace not found while evaluating learning namespace selector",
 				)
 				return ctrl.Result{}, nil
@@ -201,7 +201,7 @@ func (r *LearningReconciler) reconcile(
 			return ctrl.Result{}, fmt.Errorf("failed to get namespace %s: %w", req.Namespace, err)
 		}
 		if !r.namespaceSelector.Matches(labels.Set(ns.GetLabels())) {
-			logger.V(1).
+			logger.V(loglevel.VerbosityDebug).
 				Info("Namespace does not match learning namespace selector; skipping event", "namespace", req.Namespace)
 			return ctrl.Result{}, nil
 		}

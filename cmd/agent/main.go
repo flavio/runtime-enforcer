@@ -24,6 +24,7 @@ import (
 	"github.com/rancher-sandbox/runtime-enforcer/internal/grpcexporter"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/nri"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/resolver"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/loglevel"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/workloadpolicyhandler"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -149,8 +150,8 @@ func waitForMutatingAdmissionWebhook(ctx context.Context) error {
 		retry.OnRetry(func(n uint, err error) {
 			// n = 0 for the first retry
 			logger := log.FromContext(ctx)
-			logger.V(3). //nolint:mnd // 3 is the verbosity level for detailed debug info
-					Info("error during mutating webhook socket connection, retrying...",
+			logger.V(loglevel.VerbosityDebug).
+				Info("error during mutating webhook socket connection, retrying...",
 					"attempt", n+1,
 					"error", err,
 				)

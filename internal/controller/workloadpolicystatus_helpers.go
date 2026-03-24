@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/loglevel"
 	pb "github.com/rancher-sandbox/runtime-enforcer/proto/agent/v1"
 )
 
@@ -111,7 +112,7 @@ func (r *WorkloadPolicyStatusSync) processWorkloadPolicy(
 	// then trim to the most recent MaxViolationRecords entries.
 	newPolicy.Status.Violations = mergeViolations(wp.Status.Violations, scrapedViolations)
 
-	r.logger.V(1).Info("updating",
+	r.logger.V(loglevel.VerbosityDebug).Info("updating",
 		"policy", newPolicy.NamespacedName(),
 		"status", newPolicy.Status)
 	return r.Status().Update(ctx, newPolicy)

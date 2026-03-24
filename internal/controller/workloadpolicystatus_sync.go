@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/grpcexporter"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/loglevel"
 	pb "github.com/rancher-sandbox/runtime-enforcer/proto/agent/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,7 +94,7 @@ func (r *WorkloadPolicyStatusSync) sync(
 	}
 
 	if len(wpList.Items) == 0 {
-		r.logger.V(1).Info("No WorkloadPolicies found, retrying later")
+		r.logger.V(loglevel.VerbosityDebug).Info("No WorkloadPolicies found, retrying later")
 		return nil
 	}
 
