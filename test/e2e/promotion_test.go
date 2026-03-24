@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -135,17 +134,12 @@ func getPromotionTest() types.Feature {
 			}).
 		Assess("pod exec will not be blocked since the policy is in monitoring mode",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := getClient(ctx)
-
 				podName, err := findUbuntuDeploymentPod(ctx)
 				require.NoError(t, err)
 
-				var stdout, stderr bytes.Buffer
-
-				err = r.ExecInPod(ctx, getNamespace(ctx), podName, "ubuntu", []string{"mkdir"}, &stdout, &stderr)
-				require.Error(t, err)
-				require.Empty(t, stdout.String())
-				require.Equal(t, "mkdir: missing operand\nTry 'mkdir --help' for more information.\n", stderr.String())
+				stdout, stderr := requireExecFailsInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
+				require.Empty(t, stdout)
+				require.Equal(t, "mkdir: missing operand\nTry 'mkdir --help' for more information.\n", stderr)
 
 				return ctx
 			}).

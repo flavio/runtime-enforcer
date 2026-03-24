@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -20,7 +19,6 @@ func getEnforcementOnNewPodsTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("a namespace-scoped policy can be enforced correctly",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := getClient(ctx)
 				policy := v1alpha1.WorkloadPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-policy",
@@ -66,25 +64,12 @@ func getEnforcementOnNewPodsTest() types.Feature {
 				}
 
 				for _, expectedResult := range expectedResults {
-					var stdout, stderr bytes.Buffer
-
 					t.Log("running:", expectedResult.Commands)
-					err = r.ExecInPod(
-						ctx,
-						getNamespace(ctx),
-						podName,
-						"ubuntu",
-						expectedResult.Commands,
-						&stdout,
-						&stderr,
-					)
 
 					if expectedResult.Allowed {
-						require.NoError(t, err)
+						requireExecAllowedInCurrentNamespace(ctx, t, podName, "ubuntu", expectedResult.Commands)
 					} else {
-						require.Error(t, err)
-						require.Empty(t, stdout.String())
-						require.Contains(t, stderr.String(), "operation not permitted\n")
+						requireExecBlockedInCurrentNamespace(ctx, t, podName, "ubuntu", expectedResult.Commands)
 					}
 				}
 

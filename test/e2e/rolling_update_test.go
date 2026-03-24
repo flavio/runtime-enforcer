@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -61,32 +60,22 @@ func getRollingUpdateTest() types.Feature {
 		}).
 		Assess("verify that the test directory doesn't exist and mkdir will be blocked",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := getClient(ctx)
-
 				podName, err := findUbuntuDeploymentPod(ctx)
 				require.NoError(t, err)
 
-				var stdout, stderr bytes.Buffer
-
 				// Run mkdir to verify that it is blocked.
-				err = r.ExecInPod(ctx, getNamespace(ctx), podName, "ubuntu", []string{"mkdir"}, &stdout, &stderr)
-				require.Error(t, err)
-				require.Empty(t, stdout.String())
-				require.Contains(t, stderr.String(), "operation not permitted\n")
+				requireExecBlockedInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
 
 				// Verify that the test directory doesn't exist.
-				err = r.ExecInPod(
+				stdout, stderr := requireExecFailsInCurrentNamespace(
 					ctx,
-					getNamespace(ctx),
+					t,
 					podName,
 					"ubuntu",
 					[]string{"ls", "/tmp/testdir"},
-					&stdout,
-					&stderr,
 				)
-				require.Error(t, err)
-				require.Empty(t, stdout.String())
-				require.Contains(t, stderr.String(), "No such file or directory\n")
+				require.Empty(t, stdout)
+				require.Contains(t, stderr, "No such file or directory\n")
 				return ctx
 			}).
 		Assess("rolling update should succeed", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
@@ -116,25 +105,18 @@ func getRollingUpdateTest() types.Feature {
 			return ctx
 		}).
 		Assess("/tmp/testdir should never be created", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := getClient(ctx)
-
 			podName, err := findUbuntuDeploymentPod(ctx)
 			require.NoError(t, err)
 
-			var stdout, stderr bytes.Buffer
-
-			err = r.ExecInPod(
+			stdout, stderr := requireExecFailsInCurrentNamespace(
 				ctx,
-				getNamespace(ctx),
+				t,
 				podName,
 				"ubuntu",
 				[]string{"ls", "/tmp/testdir"},
-				&stdout,
-				&stderr,
 			)
-			require.Error(t, err)
-			require.Empty(t, stdout.String())
-			require.Contains(t, stderr.String(), "No such file or directory\n")
+			require.Empty(t, stdout)
+			require.Contains(t, stderr, "No such file or directory\n")
 			return ctx
 		}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {

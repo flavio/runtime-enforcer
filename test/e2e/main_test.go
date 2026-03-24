@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"slices"
 	"testing"
@@ -119,19 +118,11 @@ func getMainTest() types.Feature {
 			}).
 		Assess("pod exec will be blocked",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := getClient(ctx)
 				podName, err := findUbuntuDeploymentPod(ctx, func(pod corev1.Pod) bool {
 					return pod.Labels[v1alpha1.PolicyLabelKey] == "test-policy"
 				})
 				require.NoError(t, err)
-
-				var stdout, stderr bytes.Buffer
-
-				err = r.ExecInPod(ctx, getNamespace(ctx), podName, "ubuntu", []string{"mkdir"}, &stdout, &stderr)
-				require.Error(t, err)
-				require.Empty(t, stdout.String())
-				require.Equal(t, "exec /usr/bin/mkdir: operation not permitted\n", stderr.String())
-
+				requireExecBlockedInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
 				return ctx
 			}).
 		Assess("the WorkloadPolicy has the finalizer set",
