@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -31,7 +30,7 @@ func getMainTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("the workload policy proposal is created successfully for the ubuntu pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				proposal := v1alpha1.WorkloadPolicyProposal{
 					ObjectMeta: metav1.ObjectMeta{
@@ -58,7 +57,7 @@ func getMainTest() types.Feature {
 		Assess("the running process is learned",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				id := ctx.Value(key("group")).(string)
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				t.Log("waiting for workload policy proposal to be created: ", id)
 
@@ -121,7 +120,7 @@ func getMainTest() types.Feature {
 			}).
 		Assess("pod exec will be blocked",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				testNamespace := getNamespace(ctx)
 				podName, err := findPodByPrefix(ctx, testNamespace, "ubuntu-deployment", func(pod corev1.Pod) bool {
 					return pod.Labels[v1alpha1.PolicyLabelKey] == "test-policy"
@@ -139,7 +138,7 @@ func getMainTest() types.Feature {
 			}).
 		Assess("the WorkloadPolicy has the finalizer set",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				policy := &v1alpha1.WorkloadPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-policy",
@@ -164,7 +163,7 @@ func getMainTest() types.Feature {
 		Assess("Verify a non-referenced WorkloadPolicy can be deleted",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				var err error
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				nonReferencedPolicyName := "non-referenced-wp"
 
 				// Create a new WorkloadPolicy
@@ -210,7 +209,7 @@ func getMainTest() types.Feature {
 		Assess("Verify a referenced WorkloadPolicy cannot be deleted",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				var err error
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				referencedPolicyName := "referenced-wp"
 				podName := "referenced-wp-pod"
 

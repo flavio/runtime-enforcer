@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -62,7 +61,7 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("creating pod where init container runs allowed command (echo)")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				pod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -124,7 +123,7 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("creating pod where init container runs blocked command (date)")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				blockedPod := corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -191,7 +190,7 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("verifying ls is allowed in main container")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				var stdout, stderr bytes.Buffer
 
@@ -214,7 +213,7 @@ func getPolicyPerContainerTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("verifying bash is blocked in main container")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				var stdout, stderr bytes.Buffer
 
@@ -238,7 +237,7 @@ func getPolicyPerContainerTest() types.Feature {
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("cleaning up test resources")
 
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

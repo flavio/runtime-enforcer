@@ -50,7 +50,7 @@ func SetupSharedK8sClient(ctx context.Context, t *testing.T, config *envconf.Con
 func IfRequiredResourcesAreCreated(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	var err error
 
-	r := ctx.Value(key("client")).(*resources.Resources)
+	r := getClient(ctx)
 
 	err = wait.For(
 		conditions.New(r).DeploymentAvailable(
@@ -74,7 +74,7 @@ func IfRequiredResourcesAreCreated(ctx context.Context, t *testing.T, _ *envconf
 	return ctx
 }
 
-func getResources(ctx context.Context) *resources.Resources {
+func getClient(ctx context.Context) *resources.Resources {
 	return ctx.Value(key("client")).(*resources.Resources)
 }
 
@@ -86,7 +86,7 @@ func SetupTestNamespace(ctx context.Context, t *testing.T, _ *envconf.Config) co
 	t.Helper()
 	testNamespace := envconf.RandomName(runtimeEnforcerE2EPrefix, 32)
 	t.Logf("creating test namespace: %q", testNamespace)
-	err := getResources(ctx).Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
+	err := getClient(ctx).Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
 	require.NoError(t, err, "failed to create test namespace %q", testNamespace)
 	return context.WithValue(ctx, key("namespace"), testNamespace)
 }
@@ -98,7 +98,7 @@ func SetupTestNamespace(ctx context.Context, t *testing.T, _ *envconf.Config) co
 func createAndWaitWP(ctx context.Context, t *testing.T, policy *v1alpha1.WorkloadPolicy) {
 	t.Helper()
 	t.Logf("creating workload policy %q and waiting for it to become Active", policy.NamespacedName())
-	err := getResources(ctx).Create(ctx, policy)
+	err := getClient(ctx).Create(ctx, policy)
 	require.NoError(t, err, "failed to create workload policy %q", policy.NamespacedName())
 	waitForWorkloadPolicyStatusToBeUpdated(ctx, t, policy)
 }
@@ -106,10 +106,10 @@ func createAndWaitWP(ctx context.Context, t *testing.T, policy *v1alpha1.Workloa
 func deleteAndWaitWP(ctx context.Context, t *testing.T, policy *v1alpha1.WorkloadPolicy) {
 	t.Helper()
 	t.Logf("deleting workload policy %q and waiting for it to be deleted", policy.NamespacedName())
-	err := getResources(ctx).Delete(ctx, policy)
+	err := getClient(ctx).Delete(ctx, policy)
 	require.NoError(t, err, "failed to delete workload policy %q", policy.NamespacedName())
 	err = wait.For(
-		conditions.New(getResources(ctx)).ResourceDeleted(policy),
+		conditions.New(getClient(ctx)).ResourceDeleted(policy),
 		wait.WithTimeout(DefaultOperationTimeout),
 	)
 	require.NoError(t, err, "workload policy %q cannot be deleted", policy.NamespacedName())
@@ -120,7 +120,7 @@ func waitForWorkloadPolicyStatusToBeUpdated(
 	t *testing.T,
 	policy *v1alpha1.WorkloadPolicy,
 ) {
-	r := ctx.Value(key("client")).(*resources.Resources)
+	r := getClient(ctx)
 	err := wait.For(conditions.New(r).ResourceMatch(policy, func(obj k8s.Object) bool {
 		ps, ok := obj.(*v1alpha1.WorkloadPolicy)
 		if !ok {
@@ -168,7 +168,7 @@ func createAndWaitUbuntuDeployment(
 	decodeOptions := append([]decoder.DecodeOption{decoder.MutateNamespace(namespace)}, options...)
 	err := decoder.ApplyWithManifestDir(
 		ctx,
-		getResources(ctx),
+		getClient(ctx),
 		testFolder,
 		ubuntuDeploymentManifest,
 		[]resources.CreateOption{},
@@ -178,7 +178,7 @@ func createAndWaitUbuntuDeployment(
 
 	// Wait for ubuntu deployment to become available
 	err = wait.For(
-		conditions.New(getResources(ctx)).DeploymentAvailable(ubuntuDeploymentName, namespace),
+		conditions.New(getClient(ctx)).DeploymentAvailable(ubuntuDeploymentName, namespace),
 		wait.WithTimeout(DefaultOperationTimeout),
 	)
 	require.NoError(t, err, "ubuntu deployment should become available")
@@ -189,7 +189,7 @@ func deleteUbuntuDeployment(ctx context.Context, t *testing.T, namespace string)
 	t.Log("deleting test Ubuntu deployment")
 	err := decoder.DeleteWithManifestDir(
 		ctx,
-		getResources(ctx),
+		getClient(ctx),
 		testFolder,
 		ubuntuDeploymentManifest,
 		[]resources.DeleteOption{},
@@ -201,7 +201,7 @@ func deleteUbuntuDeployment(ctx context.Context, t *testing.T, namespace string)
 func findPodByPrefix(ctx context.Context, namespace string, prefix string, matches ...podMatcher) (string, error) {
 	var pods corev1.PodList
 
-	err := getResources(ctx).WithNamespace(namespace).List(ctx, &pods)
+	err := getClient(ctx).WithNamespace(namespace).List(ctx, &pods)
 	if err != nil {
 		return "", err
 	}
@@ -234,7 +234,7 @@ func execInCurrentNamespace(
 	command []string,
 ) (string, string, error) {
 	var stdout, stderr bytes.Buffer
-	err := getResources(ctx).ExecInPod(
+	err := getClient(ctx).ExecInPod(
 		ctx,
 		getNamespace(ctx),
 		podName,

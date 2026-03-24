@@ -31,7 +31,7 @@ func getLearningModeTest() types.Feature {
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("installing test resources")
 
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			err := decoder.ApplyWithManifestDir(
 				ctx,
@@ -48,7 +48,7 @@ func getLearningModeTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("the workload policy proposal is created successfully for each supported resource",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				testdata := os.DirFS("./testdata")
 
@@ -149,7 +149,7 @@ func getLearningModeTest() types.Feature {
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("uninstalling test resources")
 
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			err := decoder.DeleteWithManifestDir(
 				ctx,
@@ -197,7 +197,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 				"enabledNS: ", enabledNS,
 				"disabledNS: ", disabledNS,
 			)
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			enabled := corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   enabledNS,
@@ -213,7 +213,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 		}).
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("installing deployment in both namespaces")
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			for _, ns := range []string{enabledNS, disabledNS} {
 				err := decoder.ApplyWithManifestDir(
 					ctx,
@@ -229,7 +229,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 		}).
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("learning creates WorkloadPolicyProposal only in the labeled namespace", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			proposalName, err := proposalutils.GetWorkloadPolicyProposalName("Deployment", deploymentName)
 			require.NoError(t, err)
@@ -274,7 +274,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 		}).
 		Teardown(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			t.Log("uninstalling test resources")
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			for _, ns := range []string{enabledNS, disabledNS} {
 				err := r.Delete(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})

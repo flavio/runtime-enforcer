@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -26,7 +25,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("VAP prevents adding policy label to existing pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				// Create a pod without the policy label
@@ -83,7 +82,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("VAP prevents removing policy label from existing pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				// Create a pod with the policy label
@@ -142,7 +141,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("VAP prevents changing policy label value on existing pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				// Create a pod with the policy label
@@ -201,7 +200,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("Updating other Pod fields should be allowed when policy label exists",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				// Create a pod with the policy label
@@ -274,7 +273,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Assess("Updating other Pod fields should be allowed when policy label does not exist",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				// Create a pod without the policy label
@@ -346,7 +345,7 @@ func getValidatingAdmissionPolicyPodPolicyLabelTest() types.Feature {
 			}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("cleaning up test namespace")
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 
 			// Clean up any remaining pods
 			var pods corev1.PodList

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -28,7 +27,7 @@ func getPromotionTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("the workload proposal is created successfully for the ubuntu pod",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				proposal := v1alpha1.WorkloadPolicyProposal{
 					ObjectMeta: metav1.ObjectMeta{
@@ -55,7 +54,7 @@ func getPromotionTest() types.Feature {
 		Assess("the running process is learned",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				id := ctx.Value(key("group")).(string)
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				t.Log("waiting for policy proposal to be created: ", id)
 
@@ -92,7 +91,7 @@ func getPromotionTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				t.Log("create a policy")
 
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				proposal := ctx.Value(key("proposal")).(*v1alpha1.WorkloadPolicyProposal)
 
 				t.Log("applying the label to the policy proposal: ", proposal.Name, v1alpha1.ApprovalLabelKey)
@@ -136,7 +135,7 @@ func getPromotionTest() types.Feature {
 			}).
 		Assess("pod exec will not be blocked since the policy is in monitoring mode",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				podName, err := findPodByPrefix(ctx, getNamespace(ctx), "ubuntu-deployment")
 				require.NoError(t, err)
@@ -151,7 +150,7 @@ func getPromotionTest() types.Feature {
 				return ctx
 			}).
 		Assess("delete policy", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			policy := ctx.Value(key("policy")).(*v1alpha1.WorkloadPolicy)
 			proposal := ctx.Value(key("proposal")).(*v1alpha1.WorkloadPolicyProposal)
 

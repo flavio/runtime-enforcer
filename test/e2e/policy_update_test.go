@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -54,7 +53,7 @@ func getPolicyUpdateTest() types.Feature {
 		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("creating pod with two containers (main, sidecar)")
 
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			namespace := getNamespace(ctx)
 
 			pod := corev1.Pod{
@@ -92,7 +91,7 @@ func getPolicyUpdateTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("policy update with new executables is enforced correctly",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				t.Log("verifying /usr/bin/cat is blocked in main before update")
@@ -146,7 +145,7 @@ func getPolicyUpdateTest() types.Feature {
 			}).
 		Assess("policy update can add enforcement for a new container",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				// 1. Verify that /usr/bin/mkdir is blocked in main but allowed in sidecar
@@ -213,7 +212,7 @@ func getPolicyUpdateTest() types.Feature {
 			}).
 		Assess("policy update can disable enforcement for a single container",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				namespace := getNamespace(ctx)
 
 				t.Log("policy already has main and sidecar from previous assessment")
@@ -265,7 +264,7 @@ func getPolicyUpdateTest() types.Feature {
 			}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			t.Log("uninstalling test resources")
-			_ = getResources(ctx).Delete(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: getNamespace(ctx)}})
+			_ = getClient(ctx).Delete(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: getNamespace(ctx)}})
 			return ctx
 		}).Feature()
 }

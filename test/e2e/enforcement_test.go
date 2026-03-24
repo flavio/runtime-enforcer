@@ -8,7 +8,6 @@ import (
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/e2e-framework/pkg/types"
@@ -21,7 +20,7 @@ func getEnforcementOnNewPodsTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("a namespace-scoped policy can be enforced correctly",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 				testNamespace := getNamespace(ctx)
 				policy := v1alpha1.WorkloadPolicy{
 					ObjectMeta: metav1.ObjectMeta{

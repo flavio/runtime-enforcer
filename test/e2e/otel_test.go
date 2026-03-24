@@ -22,7 +22,6 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -70,7 +69,7 @@ func getOtelCollectorTest() types.Feature {
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
 		Assess("OTEL collector deployment is ready",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				t.Log("waiting for OTEL collector deployment to be available")
 				err := wait.For(
@@ -88,7 +87,7 @@ func getOtelCollectorTest() types.Feature {
 			func(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 				namespace := getNamespace(ctx)
 				expectedPodName := ctx.Value(key("targetPodName")).(string)
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				t.Log("executing disallowed command to trigger a violation")
 				var stdout, stderr bytes.Buffer

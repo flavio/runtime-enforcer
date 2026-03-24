@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
@@ -62,7 +61,7 @@ func getRollingUpdateTest() types.Feature {
 		}).
 		Assess("verify that the test directory doesn't exist and mkdir will be blocked",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := ctx.Value(key("client")).(*resources.Resources)
+				r := getClient(ctx)
 
 				namespace := getNamespace(ctx)
 				podName, err := findPodByPrefix(ctx, namespace, "ubuntu-deployment")
@@ -92,7 +91,7 @@ func getRollingUpdateTest() types.Feature {
 				return ctx
 			}).
 		Assess("rolling update should succeed", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			agentDaemonSet := appsv1.DaemonSet{}
 			err := r.Get(
 				ctx,
@@ -118,7 +117,7 @@ func getRollingUpdateTest() types.Feature {
 			return ctx
 		}).
 		Assess("/tmp/testdir should never be created", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := ctx.Value(key("client")).(*resources.Resources)
+			r := getClient(ctx)
 			namespace := getNamespace(ctx)
 
 			podName, err := findPodByPrefix(ctx, namespace, "ubuntu-deployment")
