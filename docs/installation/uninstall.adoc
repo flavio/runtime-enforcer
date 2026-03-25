@@ -11,13 +11,11 @@ Please note that this command will not delete the existing WorkloadPolicy and Wo
 To remove them, you can run the following commands:
 
 ```bash
-kubectl get workloadpolicies.security.rancher.io --all-namespaces -o custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace --no-headers | while read name namespace; do
-  kubectl patch workloadpolicies.security.rancher.io $name -n $namespace --type=merge -p '{"metadata":{"finalizers":[]}}'
-done
-
 kubectl delete crd workloadpolicies.security.rancher.io
 kubectl delete crd workloadpolicyproposals.security.rancher.io
 ```
+
+Note: Deletion of a `WorkloadPolicy` will fail while at least one pod is still referencing it. Remove the pod(s) first, then delete the policy.
 
 Finally, delete the namespace where Runtime-Enforcer was deployed:
 

@@ -200,6 +200,8 @@ func deleteUbuntuDeployment(ctx context.Context, t *testing.T) {
 		decoder.MutateNamespace(getNamespace(ctx)),
 	)
 	require.NoError(t, err, "failed to delete test data")
+
+	waitForUbuntuDeploymentDeleted(ctx, t)
 }
 
 func waitForUbuntuDeploymentDeleted(ctx context.Context, t *testing.T) {

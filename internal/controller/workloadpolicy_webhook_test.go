@@ -7,96 +7,82 @@ import (
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/controller"
 	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("WorkloadPolicy Webhook", func() {
-	Context("When creating a WorkloadPolicy", func() {
-		It("should add finalizer on CREATE", func() {
-			By("creating a policy without finalizer")
+	const (
+		testNS        = "default"
+		policyName    = "test-policy"
+		containerName = "test-container"
+		podName       = "test-pod"
+	)
 
-			policy := &v1alpha1.WorkloadPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-policy",
-					Namespace: "default",
-				},
-				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: policymode.MonitorString,
-					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
-						"container1": {
-							Executables: v1alpha1.WorkloadPolicyExecutables{
-								Allowed: []string{"/usr/bin/sleep"},
-							},
+	var (
+		policy    *v1alpha1.WorkloadPolicy
+		validator *controller.PolicyCustomValidator
+	)
+
+	BeforeEach(func() {
+		policy = &v1alpha1.WorkloadPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      policyName,
+				Namespace: testNS,
+			},
+			Spec: v1alpha1.WorkloadPolicySpec{
+				Mode: policymode.MonitorString,
+				RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
+					containerName: {
+						Executables: v1alpha1.WorkloadPolicyExecutables{
+							Allowed: []string{"/usr/bin/sleep"},
 						},
 					},
 				},
-			}
+			},
+		}
+		Expect(k8sClient.Create(ctx, policy)).To(Succeed())
 
-			webhook := &controller.PolicyWebhook{}
-			err := webhook.Default(ctx, policy)
+		validator = &controller.PolicyCustomValidator{
+			Client: k8sClient,
+		}
+	})
+
+	AfterEach(func() {
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &v1alpha1.WorkloadPolicy{
+			ObjectMeta: metav1.ObjectMeta{Name: policyName, Namespace: testNS},
+		}))).To(Succeed())
+	})
+
+	Context("ValidateDelete", func() {
+		It("allows deletion when no pods reference the policy", func() {
+			warns, err := validator.ValidateDelete(ctx, policy)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(controllerutil.ContainsFinalizer(policy, v1alpha1.WorkloadPolicyFinalizer)).To(BeTrue())
-			Expect(policy.Finalizers).To(ContainElement(v1alpha1.WorkloadPolicyFinalizer))
+			Expect(warns).To(BeEmpty())
 		})
 
-		It("should be idempotent - not add duplicate finalizer", func() {
-			By("creating a policy with finalizer already present")
-
-			policy := &v1alpha1.WorkloadPolicy{
+		It("denies deletion when a pod references the policy", func() {
+			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-policy-idempotent",
-					Namespace:  "default",
-					Finalizers: []string{v1alpha1.WorkloadPolicyFinalizer},
-				},
-				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: policymode.MonitorString,
-					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
-						"container1": {
-							Executables: v1alpha1.WorkloadPolicyExecutables{
-								Allowed: []string{"/usr/bin/sleep"},
-							},
-						},
+					Name:      podName,
+					Namespace: testNS,
+					Labels: map[string]string{
+						v1alpha1.PolicyLabelKey: policyName,
 					},
 				},
-			}
-
-			initialFinalizerCount := len(policy.Finalizers)
-
-			webhook := &controller.PolicyWebhook{}
-			err := webhook.Default(ctx, policy)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(policy.Finalizers).To(HaveLen(initialFinalizerCount))
-			Expect(policy.Finalizers).To(ContainElement(v1alpha1.WorkloadPolicyFinalizer))
-		})
-
-		It("should add finalizer even when other finalizers exist", func() {
-			By("creating a policy with other finalizers")
-
-			policy := &v1alpha1.WorkloadPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-policy-multiple-finalizers",
-					Namespace:  "default",
-					Finalizers: []string{"other-finalizer"},
-				},
-				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: policymode.ProtectString,
-					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
-						"container1": {
-							Executables: v1alpha1.WorkloadPolicyExecutables{
-								Allowed: []string{"/usr/bin/sleep"},
-							},
-						},
-					},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: containerName, Image: "pause"}},
 				},
 			}
+			Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, ctx, pod)
 
-			webhook := &controller.PolicyWebhook{}
-			err := webhook.Default(ctx, policy)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(policy.Finalizers).To(ContainElement("other-finalizer"))
-			Expect(policy.Finalizers).To(ContainElement(v1alpha1.WorkloadPolicyFinalizer))
-			Expect(policy.Finalizers).To(HaveLen(2))
+			_, err := validator.ValidateDelete(ctx, policy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsForbidden(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring(pod.Name))
 		})
 	})
 })
