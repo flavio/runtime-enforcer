@@ -83,7 +83,8 @@ func getNamespace(ctx context.Context) string {
 
 func SetupTestNamespace(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
-	testNamespace := envconf.RandomName(runtimeEnforcerE2EPrefix, 32)
+	// RandomName already adds a `-` so we need to trim it from our prefix
+	testNamespace := envconf.RandomName(strings.TrimSuffix(runtimeEnforcerE2EPrefix, "-"), 32)
 	t.Logf("creating test namespace: %q", testNamespace)
 	err := getClient(ctx).Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
 	require.NoError(t, err, "failed to create test namespace %q", testNamespace)
