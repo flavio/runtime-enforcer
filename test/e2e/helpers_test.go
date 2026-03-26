@@ -24,15 +24,14 @@ import (
 )
 
 const (
-	DefaultHelmTimeout       = time.Minute * 5
-	DefaultOperationTimeout  = time.Minute
+	defaultHelmTimeout       = time.Minute * 5
+	defaultOperationTimeout  = time.Minute
 	testFolder               = "./testdata"
 	ubuntuDeploymentManifest = "ubuntu-deployment.yaml"
 	ubuntuDeploymentName     = "ubuntu-deployment"
 	operationNotPermittedMsg = "operation not permitted"
 )
 
-type podMatcher func(corev1.Pod) bool
 type key string
 
 func SetupSharedK8sClient(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
@@ -57,7 +56,7 @@ func IfRequiredResourcesAreCreated(ctx context.Context, t *testing.T, _ *envconf
 			"runtime-enforcer-controller-manager",
 			runtimeEnforcerNamespace,
 		),
-		wait.WithTimeout(DefaultOperationTimeout),
+		wait.WithTimeout(defaultOperationTimeout),
 	)
 	require.NoError(t, err)
 
@@ -68,7 +67,7 @@ func IfRequiredResourcesAreCreated(ctx context.Context, t *testing.T, _ *envconf
 				Namespace: runtimeEnforcerNamespace,
 			},
 		}),
-		wait.WithTimeout(DefaultOperationTimeout),
+		wait.WithTimeout(defaultOperationTimeout),
 	)
 	require.NoError(t, err)
 	return ctx
@@ -84,7 +83,8 @@ func getNamespace(ctx context.Context) string {
 
 func SetupTestNamespace(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
-	testNamespace := envconf.RandomName(runtimeEnforcerE2EPrefix, 32)
+	// RandomName already adds a `-` so we need to trim it from our prefix
+	testNamespace := envconf.RandomName(strings.TrimSuffix(runtimeEnforcerE2EPrefix, "-"), 32)
 	t.Logf("creating test namespace: %q", testNamespace)
 	err := getClient(ctx).Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
 	require.NoError(t, err, "failed to create test namespace %q", testNamespace)
@@ -110,7 +110,7 @@ func deleteAndWaitWP(ctx context.Context, t *testing.T, policy *v1alpha1.Workloa
 	require.NoError(t, err, "failed to delete workload policy %q", policy.NamespacedName())
 	err = wait.For(
 		conditions.New(getClient(ctx)).ResourceDeleted(policy),
-		wait.WithTimeout(DefaultOperationTimeout),
+		wait.WithTimeout(defaultOperationTimeout),
 	)
 	require.NoError(t, err, "workload policy %q cannot be deleted", policy.NamespacedName())
 }
@@ -179,7 +179,7 @@ func createAndWaitUbuntuDeployment(
 	// Wait for ubuntu deployment to become available
 	err = wait.For(
 		conditions.New(getClient(ctx)).DeploymentAvailable(ubuntuDeploymentName, namespace),
-		wait.WithTimeout(DefaultOperationTimeout),
+		wait.WithTimeout(defaultOperationTimeout),
 	)
 	require.NoError(t, err, "ubuntu deployment should become available")
 }
@@ -187,18 +187,38 @@ func createAndWaitUbuntuDeployment(
 func deleteUbuntuDeployment(ctx context.Context, t *testing.T) {
 	t.Helper()
 	t.Log("deleting test Ubuntu deployment")
+	// With foreground cascading deletion the Deployment resource is only removed
+	// once all its owned pods have been terminated, so a single wait on the deployment is enough.
 	err := decoder.DeleteWithManifestDir(
 		ctx,
 		getClient(ctx),
 		testFolder,
 		ubuntuDeploymentManifest,
-		[]resources.DeleteOption{},
+		[]resources.DeleteOption{
+			resources.WithDeletePropagation("Foreground"),
+		},
 		decoder.MutateNamespace(getNamespace(ctx)),
 	)
 	require.NoError(t, err, "failed to delete test data")
 }
 
-func findPodByPrefix(ctx context.Context, namespace string, prefix string, matches ...podMatcher) (string, error) {
+func waitForUbuntuDeploymentDeleted(ctx context.Context, t *testing.T) {
+	t.Helper()
+	t.Log("waiting for Ubuntu deployment to be deleted")
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ubuntuDeploymentName,
+			Namespace: getNamespace(ctx),
+		},
+	}
+	err := wait.For(
+		conditions.New(getClient(ctx)).ResourceDeleted(deployment),
+		wait.WithTimeout(defaultOperationTimeout),
+	)
+	require.NoError(t, err, "ubuntu deployment should be deleted")
+}
+
+func findPodByPrefix(ctx context.Context, namespace string, prefix string) (string, error) {
 	var pods corev1.PodList
 
 	err := getClient(ctx).WithNamespace(namespace).List(ctx, &pods)
@@ -207,19 +227,7 @@ func findPodByPrefix(ctx context.Context, namespace string, prefix string, match
 	}
 
 	for _, pod := range pods.Items {
-		if !strings.HasPrefix(pod.Name, prefix) {
-			continue
-		}
-
-		matched := true
-		for _, match := range matches {
-			if match != nil && !match(pod) {
-				matched = false
-				break
-			}
-		}
-
-		if matched {
+		if strings.HasPrefix(pod.Name, prefix) {
 			return pod.Name, nil
 		}
 	}
@@ -227,8 +235,8 @@ func findPodByPrefix(ctx context.Context, namespace string, prefix string, match
 	return "", fmt.Errorf("pod with prefix %q not found in namespace %q", prefix, namespace)
 }
 
-func findUbuntuDeploymentPod(ctx context.Context, matches ...podMatcher) (string, error) {
-	return findPodByPrefix(ctx, getNamespace(ctx), "ubuntu-deployment", matches...)
+func findUbuntuDeploymentPod(ctx context.Context) (string, error) {
+	return findPodByPrefix(ctx, getNamespace(ctx), ubuntuDeploymentName)
 }
 
 func execInCurrentNamespace(
@@ -264,19 +272,6 @@ func requireExecAllowedInCurrentNamespace(
 	return stdout, stderr
 }
 
-func requireExecFailsInCurrentNamespace(
-	ctx context.Context,
-	t *testing.T,
-	podName string,
-	containerName string,
-	command []string,
-) (string, string) {
-	t.Helper()
-	stdout, stderr, err := execInCurrentNamespace(ctx, podName, containerName, command)
-	require.Error(t, err)
-	return stdout, stderr
-}
-
 func requireExecBlockedInCurrentNamespace(
 	ctx context.Context,
 	t *testing.T,
@@ -285,7 +280,8 @@ func requireExecBlockedInCurrentNamespace(
 	command []string,
 ) {
 	t.Helper()
-	stdout, stderr := requireExecFailsInCurrentNamespace(ctx, t, podName, containerName, command)
+	stdout, stderr, err := execInCurrentNamespace(ctx, podName, containerName, command)
+	require.Error(t, err)
 	require.Empty(t, stdout)
 	require.Contains(t, stderr, operationNotPermittedMsg)
 }

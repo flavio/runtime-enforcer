@@ -28,7 +28,7 @@ func getMonitoringTest() types.Feature {
 					Namespace: getNamespace(ctx),
 				},
 				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: "monitor",
+					Mode: policymode.MonitorString,
 					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 						"ubuntu": {
 							Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -95,7 +95,7 @@ func getMonitoringTest() types.Feature {
 						}
 					}
 					return false
-				}), wait.WithTimeout(DefaultOperationTimeout))
+				}), wait.WithTimeout(defaultOperationTimeout))
 				require.NoError(t, err, "violation for /usr/bin/apt should appear in WorkloadPolicy status")
 
 				t.Log("verifying violation record details")

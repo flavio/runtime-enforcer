@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ func getRollingUpdateTest() types.Feature {
 					Namespace: getNamespace(ctx),
 				},
 				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: "protect",
+					Mode: policymode.ProtectString,
 					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 						"ubuntu": {
 							Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -67,15 +68,13 @@ func getRollingUpdateTest() types.Feature {
 				requireExecBlockedInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
 
 				// Verify that the test directory doesn't exist.
-				stdout, stderr := requireExecFailsInCurrentNamespace(
+				_, _ = requireExecAllowedInCurrentNamespace(
 					ctx,
 					t,
 					podName,
 					"ubuntu",
-					[]string{"ls", "/tmp/testdir"},
+					[]string{"bash", "-c", "[ ! -d /tmp/testdir ]"},
 				)
-				require.Empty(t, stdout)
-				require.Contains(t, stderr, "No such file or directory\n")
 				return ctx
 			}).
 		Assess("rolling update should succeed", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
@@ -99,7 +98,7 @@ func getRollingUpdateTest() types.Feature {
 					Namespace: runtimeEnforcerNamespace,
 				},
 			}),
-				wait.WithTimeout(DefaultOperationTimeout),
+				wait.WithTimeout(defaultOperationTimeout),
 			)
 			require.NoError(t, err)
 			return ctx
@@ -108,15 +107,13 @@ func getRollingUpdateTest() types.Feature {
 			podName, err := findUbuntuDeploymentPod(ctx)
 			require.NoError(t, err)
 
-			stdout, stderr := requireExecFailsInCurrentNamespace(
+			_, _ = requireExecAllowedInCurrentNamespace(
 				ctx,
 				t,
 				podName,
 				"ubuntu",
-				[]string{"ls", "/tmp/testdir"},
+				[]string{"bash", "-c", "[ ! -d /tmp/testdir ]"},
 			)
-			require.Empty(t, stdout)
-			require.Contains(t, stderr, "No such file or directory\n")
 			return ctx
 		}).
 		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {

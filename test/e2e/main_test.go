@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,13 +42,13 @@ func getMainTest() types.Feature {
 					&proposal,
 					func(object k8s.Object) bool {
 						obj := object.(*v1alpha1.WorkloadPolicyProposal)
-						if obj.OwnerReferences[0].Name == "ubuntu-deployment" &&
+						if obj.OwnerReferences[0].Name == ubuntuDeploymentName &&
 							obj.OwnerReferences[0].Kind == "Deployment" {
 							return true
 						}
 						return false
 					}),
-					wait.WithTimeout(DefaultOperationTimeout),
+					wait.WithTimeout(defaultOperationTimeout),
 				)
 				require.NoError(t, err)
 
@@ -79,7 +80,7 @@ func getMainTest() types.Feature {
 
 						return verifyUbuntuLearnedProcesses(rules.Executables.Allowed)
 					}),
-					wait.WithTimeout(DefaultOperationTimeout),
+					wait.WithTimeout(defaultOperationTimeout),
 				)
 				require.NoError(t, err)
 
@@ -94,7 +95,7 @@ func getMainTest() types.Feature {
 						Namespace: proposal.ObjectMeta.Namespace,
 					},
 					Spec: v1alpha1.WorkloadPolicySpec{
-						Mode: "protect",
+						Mode: policymode.ProtectString,
 						RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 							"ubuntu": {
 								Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -112,15 +113,16 @@ func getMainTest() types.Feature {
 				// Delete the ubuntu deployment
 				deleteUbuntuDeployment(ctx, t)
 
+				// Wait for the ubuntu deployment to be deleted
+				waitForUbuntuDeploymentDeleted(ctx, t)
+
 				// Create the ubuntu deployment again with policy label assigned.
 				createAndWaitUbuntuDeployment(ctx, t, withPolicy("test-policy"))
 				return ctx
 			}).
 		Assess("pod exec will be blocked",
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				podName, err := findUbuntuDeploymentPod(ctx, func(pod corev1.Pod) bool {
-					return pod.Labels[v1alpha1.PolicyLabelKey] == "test-policy"
-				})
+				podName, err := findUbuntuDeploymentPod(ctx)
 				require.NoError(t, err)
 				requireExecBlockedInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
 				return ctx
@@ -143,7 +145,7 @@ func getMainTest() types.Feature {
 							return slices.Contains(wp.Finalizers, v1alpha1.WorkloadPolicyFinalizer)
 						},
 					),
-					wait.WithTimeout(DefaultOperationTimeout),
+					wait.WithTimeout(defaultOperationTimeout),
 				)
 				require.NoError(t, err, "WorkloadPolicy finalizer is not set")
 
@@ -162,7 +164,7 @@ func getMainTest() types.Feature {
 						Namespace: getNamespace(ctx),
 					},
 					Spec: v1alpha1.WorkloadPolicySpec{
-						Mode: "monitor",
+						Mode: policymode.MonitorString,
 						RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 							"ubuntu": {
 								Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -209,7 +211,7 @@ func getMainTest() types.Feature {
 						Namespace: getNamespace(ctx),
 					},
 					Spec: v1alpha1.WorkloadPolicySpec{
-						Mode: "monitor",
+						Mode: policymode.MonitorString,
 						RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 							"ubuntu": {
 								Executables: v1alpha1.WorkloadPolicyExecutables{

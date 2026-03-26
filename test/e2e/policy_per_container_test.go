@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,7 @@ func getPolicyPerContainerTest() types.Feature {
 					Namespace: getNamespace(ctx),
 				},
 				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: "protect",
+					Mode: policymode.ProtectString,
 					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 						"init-container": {
 							Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -94,7 +95,7 @@ func getPolicyPerContainerTest() types.Feature {
 
 				err = wait.For(
 					conditions.New(r).PodReady(&pod),
-					wait.WithTimeout(DefaultOperationTimeout),
+					wait.WithTimeout(defaultOperationTimeout),
 				)
 				require.NoError(t, err, "pod did not become ready")
 
@@ -229,7 +230,7 @@ func getPolicyPerContainerTest() types.Feature {
 
 			err = wait.For(
 				conditions.New(r).ResourceDeleted(&pod),
-				wait.WithTimeout(DefaultOperationTimeout),
+				wait.WithTimeout(defaultOperationTimeout),
 			)
 			require.NoError(t, err, "pod was not deleted within timeout")
 

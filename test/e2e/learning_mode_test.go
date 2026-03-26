@@ -115,7 +115,7 @@ func getLearningModeTest() types.Feature {
 						func(_ k8s.Object) bool {
 							return true
 						}),
-						wait.WithTimeout(DefaultOperationTimeout),
+						wait.WithTimeout(defaultOperationTimeout),
 					)
 					require.NoError(t, err)
 					require.Len(t, proposal.OwnerReferences, 1)
@@ -139,7 +139,7 @@ func getLearningModeTest() types.Feature {
 
 							return verifyUbuntuLearnedProcesses(rules.Executables.Allowed)
 						}),
-						wait.WithTimeout(DefaultOperationTimeout),
+						wait.WithTimeout(defaultOperationTimeout),
 					)
 					require.NoError(t, err)
 				}
@@ -170,7 +170,6 @@ func getLearningModeTest() types.Feature {
 func getLearningModeNamespaceSelectorTest() types.Feature {
 	enabledNS := envconf.RandomName("learning-enabled-ns", 32)
 	disabledNS := envconf.RandomName("learning-disabled-ns", 32)
-	const deploymentName = "ubuntu-deployment"
 
 	return features.New("LearningModeNamespaceSelector").
 		Setup(SetupSharedK8sClient).
@@ -185,7 +184,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 				helm.WithArgs("--reuse-values"),
 				helm.WithArgs("--set", "learning.namespaceSelector=env=e2e-test"),
 				helm.WithWait(),
-				helm.WithTimeout(DefaultHelmTimeout.String()),
+				helm.WithTimeout(defaultHelmTimeout.String()),
 			)
 			require.NoError(t, err, "failed to enable learning namespace selector for test")
 
@@ -231,7 +230,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 		Assess("learning creates WorkloadPolicyProposal only in the labeled namespace", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			r := getClient(ctx)
 
-			proposalName, err := proposalutils.GetWorkloadPolicyProposalName("Deployment", deploymentName)
+			proposalName, err := proposalutils.GetWorkloadPolicyProposalName("Deployment", ubuntuDeploymentName)
 			require.NoError(t, err)
 
 			t.Log("verifying proposal is created and learns in the learning-enabled namespace")
@@ -251,7 +250,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 					rules, ok := p.Spec.RulesByContainer["ubuntu"]
 					return ok && verifyUbuntuLearnedProcesses(rules.Executables.Allowed)
 				}),
-				wait.WithTimeout(DefaultOperationTimeout),
+				wait.WithTimeout(defaultOperationTimeout),
 			)
 			require.NoError(
 				t,
@@ -290,7 +289,7 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 				helm.WithArgs("--reuse-values"),
 				helm.WithArgs("--set", "learning.namespaceSelector="),
 				helm.WithWait(),
-				helm.WithTimeout(DefaultHelmTimeout.String()),
+				helm.WithTimeout(defaultHelmTimeout.String()),
 			)
 			require.NoError(t, err, "failed to disable learning namespace selector after test")
 

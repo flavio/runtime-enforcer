@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
@@ -38,13 +39,13 @@ func getPromotionTest() types.Feature {
 					&proposal,
 					func(object k8s.Object) bool {
 						obj := object.(*v1alpha1.WorkloadPolicyProposal)
-						if obj.OwnerReferences[0].Name == "ubuntu-deployment" &&
+						if obj.OwnerReferences[0].Name == ubuntuDeploymentName &&
 							obj.OwnerReferences[0].Kind == "Deployment" {
 							return true
 						}
 						return false
 					}),
-					wait.WithTimeout(DefaultOperationTimeout),
+					wait.WithTimeout(defaultOperationTimeout),
 				)
 				require.NoError(t, err)
 
@@ -80,7 +81,7 @@ func getPromotionTest() types.Feature {
 
 						return verifyUbuntuLearnedProcesses(rules.Executables.Allowed)
 					}),
-					wait.WithTimeout(DefaultOperationTimeout),
+					wait.WithTimeout(defaultOperationTimeout),
 				)
 				require.NoError(t, err)
 
@@ -114,7 +115,7 @@ func getPromotionTest() types.Feature {
 						Namespace: proposal.ObjectMeta.Namespace,
 					},
 					Spec: v1alpha1.WorkloadPolicySpec{
-						Mode: "monitor",
+						Mode: policymode.MonitorString,
 						RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 							"ubuntu": {
 								Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -127,7 +128,7 @@ func getPromotionTest() types.Feature {
 
 				err = wait.For(conditions.New(r).ResourceMatch(&policy, func(_ k8s.Object) bool {
 					return true
-				}), wait.WithTimeout(DefaultOperationTimeout))
+				}), wait.WithTimeout(defaultOperationTimeout))
 				require.NoError(t, err)
 
 				return context.WithValue(ctx, key("policy"), &policy)
@@ -136,11 +137,8 @@ func getPromotionTest() types.Feature {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				podName, err := findUbuntuDeploymentPod(ctx)
 				require.NoError(t, err)
-
-				stdout, stderr := requireExecFailsInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
-				require.Empty(t, stdout)
-				require.Equal(t, "mkdir: missing operand\nTry 'mkdir --help' for more information.\n", stderr)
-
+				// /usr/bin/true is not allowed but we are in monitor mode.
+				_, _ = requireExecAllowedInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"/usr/bin/true"})
 				return ctx
 			}).
 		Assess("delete policy", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {

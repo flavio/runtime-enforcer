@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rancher-sandbox/runtime-enforcer/api/v1alpha1"
+	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,7 @@ func getPolicyUpdateTest() types.Feature {
 					Namespace: getNamespace(ctx),
 				},
 				Spec: v1alpha1.WorkloadPolicySpec{
-					Mode: "protect",
+					Mode: policymode.ProtectString,
 					RulesByContainer: map[string]*v1alpha1.WorkloadPolicyRules{
 						mainContainer: {
 							Executables: v1alpha1.WorkloadPolicyExecutables{
@@ -83,7 +84,7 @@ func getPolicyUpdateTest() types.Feature {
 
 			err := r.Create(ctx, &pod)
 			require.NoError(t, err, "failed to create policy-update pod")
-			err = wait.For(conditions.New(r).PodReady(&pod), wait.WithTimeout(DefaultOperationTimeout))
+			err = wait.For(conditions.New(r).PodReady(&pod), wait.WithTimeout(defaultOperationTimeout))
 			require.NoError(t, err, "pod did not become ready")
 
 			return ctx
