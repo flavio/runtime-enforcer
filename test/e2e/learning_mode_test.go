@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/e2e-framework/pkg/types"
-	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
 
 func getLearningModeTest() types.Feature {
@@ -168,109 +167,39 @@ func getLearningModeTest() types.Feature {
 		}).Feature()
 }
 
-func getLearningModeNamespaceSelectorTest() types.Feature {
-	enabledNS := envconf.RandomName("learning-enabled-ns", 32)
-	disabledNS := envconf.RandomName("learning-disabled-ns", 32)
-	const defaultLearningSelector = `'learning.namespaceSelector={"matchExpressions":[{"key":"kubernetes.io/metadata.name","operator":"Exists"}],"matchLabels":{}}'`
-	const e2eLearningSelector = `'learning.namespaceSelector={"matchExpressions":[],"matchLabels":{"env":"e2e-test"}}'`
-
-	return features.New("LearningModeNamespaceSelector").
+func getNoLearningModeTest() types.Feature {
+	return features.New("learning disabled in namespace").
 		Setup(SetupSharedK8sClient).
-		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			t.Log("enabling learning namespace selector env=e2e-test for this test only")
-
-			manager := helm.New(cfg.KubeconfigFile())
-			err := manager.RunUpgrade(
-				helm.WithName("runtime-enforcer"),
-				helm.WithNamespace(runtimeEnforcerNamespace),
-				helm.WithChart("../../charts/runtime-enforcer/"),
-				helm.WithArgs("--reuse-values"),
-				helm.WithArgs("--set-json", e2eLearningSelector),
-				helm.WithWait(),
-				helm.WithTimeout(defaultHelmTimeout.String()),
-			)
-			require.NoError(t, err, "failed to enable learning namespace selector for test")
-
-			return ctx
-		}).
-		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log(
-				"creating namespaces: one with selector label (should be learned), one without (should not be learned)",
-				"enabledNS: ", enabledNS,
-				"disabledNS: ", disabledNS,
-			)
-			r := getClient(ctx)
-			enabled := corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   enabledNS,
-					Labels: map[string]string{"env": "e2e-test"},
-				},
-			}
-			disabled := corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: disabledNS},
-			}
-			require.NoError(t, r.Create(ctx, &enabled))
-			require.NoError(t, r.Create(ctx, &disabled))
-			return ctx
-		}).
-		Setup(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			t.Log("installing deployment in both namespaces")
-			r := getClient(ctx)
-			for _, ns := range []string{enabledNS, disabledNS} {
-				err := decoder.ApplyWithManifestDir(
-					ctx,
-					r,
-					"./testdata",
-					"ubuntu-deployment.yaml",
-					[]resources.CreateOption{},
-					decoder.MutateNamespace(ns),
-				)
-				require.NoError(t, err, "failed to apply test data in namespace %s", ns)
-			}
-			return ctx
-		}).
+		Assess("create a namespace without the learning label",
+			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+				disabledNS := envconf.RandomName("learning-disabled-ns", 32)
+				t.Logf("creating a namespace without the selector: %s", disabledNS)
+				r := getClient(ctx)
+				require.NoError(t, r.Create(ctx, &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: disabledNS,
+					},
+				}))
+				return context.WithValue(ctx, key("namespace"), disabledNS)
+			}).
 		Assess("required resources become available", IfRequiredResourcesAreCreated).
-		Assess("learning creates WorkloadPolicyProposal only in the labeled namespace", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-			r := getClient(ctx)
-
+		Assess("install ubuntu deployment in disabled namespace", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+			createAndWaitUbuntuDeployment(ctx, t)
+			return ctx
+		}).
+		Assess("no proposal for ubuntu deployment", func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 			proposalName, err := proposalutils.GetWorkloadPolicyProposalName("Deployment", ubuntuDeploymentName)
 			require.NoError(t, err)
 
-			t.Log("verifying proposal is created and learns in the learning-enabled namespace")
 			proposal := v1alpha1.WorkloadPolicyProposal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      proposalName,
-					Namespace: enabledNS,
-				},
-			}
-			err = wait.For(conditions.New(r).ResourceMatch(
-				&proposal,
-				func(obj k8s.Object) bool {
-					p, ok := obj.(*v1alpha1.WorkloadPolicyProposal)
-					if !ok || p.Spec.RulesByContainer == nil {
-						return false
-					}
-					rules, ok := p.Spec.RulesByContainer["ubuntu"]
-					return ok && verifyUbuntuLearnedProcesses(rules.Executables.Allowed)
-				}),
-				wait.WithTimeout(defaultOperationTimeout),
-			)
-			require.NoError(
-				t,
-				err,
-				"expected WorkloadPolicyProposal to be created and learn in namespace %s",
-				enabledNS,
-			)
-
-			t.Log("verifying no managed WorkloadPolicyProposal exists in the learning-disabled namespace")
-			proposal = v1alpha1.WorkloadPolicyProposal{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      proposalName,
-					Namespace: disabledNS,
+					Namespace: getNamespace(ctx),
 				},
 			}
 
 			// we want to be sure the proposal is not created so we need to try several times.
+			r := getClient(ctx)
 			err = wait.For(conditions.New(r).ResourceMatch(
 				&proposal,
 				func(obj k8s.Object) bool {
@@ -285,34 +214,13 @@ func getLearningModeNamespaceSelectorTest() types.Feature {
 			require.Error(
 				t,
 				err,
-				"WorkloadPolicyProposal should not be created in namespace %s",
-				disabledNS,
+				"proposal should not be created in namespace %s",
+				getNamespace(ctx),
 			)
-
 			return ctx
 		}).
-		Teardown(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			t.Log("uninstalling test resources")
-			r := getClient(ctx)
-
-			for _, ns := range []string{enabledNS, disabledNS} {
-				err := r.Delete(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
-				require.NoError(t, err, "failed to delete namespace %s", ns)
-			}
-
-			t.Log("restoring default learning namespace selector after test")
-			manager := helm.New(cfg.KubeconfigFile())
-			err := manager.RunUpgrade(
-				helm.WithName("runtime-enforcer"),
-				helm.WithNamespace(runtimeEnforcerNamespace),
-				helm.WithChart("../../charts/runtime-enforcer/"),
-				helm.WithArgs("--reuse-values"),
-				helm.WithArgs("--set-json", defaultLearningSelector),
-				helm.WithWait(),
-				helm.WithTimeout(defaultHelmTimeout.String()),
-			)
-			require.NoError(t, err, "failed to restore default learning namespace selector after test")
-
+		Teardown(func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+			deleteUbuntuDeployment(ctx, t)
 			return ctx
 		}).Feature()
 }

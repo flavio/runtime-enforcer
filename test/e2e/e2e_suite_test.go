@@ -18,7 +18,12 @@ import (
 
 //nolint:gochecknoglobals // provided by e2e-framework
 var (
-	testEnv env.Environment
+	testEnv              env.Environment
+	testLearningSelector = fmt.Sprintf(
+		`'learning.namespaceSelector={"matchExpressions":null,"matchLabels":{"%s":"%s"}}'`,
+		testNamespaceLabelKey,
+		testNamespaceLabelValue,
+	)
 )
 
 const (
@@ -31,6 +36,8 @@ const (
 	runtimeEnforcerE2EPrefix    = "run-enf-e2e-"
 	runtimeEnforcerNamespace    = runtimeEnforcerE2EPrefix + "runtime-enforcer"
 	otelCollectorDeploymentName = "runtime-enforcer-otel-collector"
+	testNamespaceLabelKey       = "security.rancher.io/learning"
+	testNamespaceLabelValue     = "runtime-enforcer-e2e-test"
 )
 
 func useExistingCluster() bool {
@@ -69,6 +76,9 @@ func getCharts() []helmChart {
 				helm.WithArgs("--set", "debugger.enabled=true"),
 				// we need to reduce the timeout to see the wp status controller working properly in e2e tests
 				helm.WithArgs("--set", "controller.wpStatusUpdateInterval=2s"),
+				// All test namespaces will be created with these labels, so that if we want to disable the learning
+				// it is enough to not put the label on the namespace.
+				helm.WithArgs("--set-json", testLearningSelector),
 			},
 		},
 	}
