@@ -82,7 +82,7 @@ spec:
             volumeAttributes:
               csi.cert-manager.io/issuer-name: {{ include "runtime-enforcer.caIssuerName" . }}
               csi.cert-manager.io/issuer-kind: Issuer
-              csi.cert-manager.io/dns-names: {{ include "runtime-enforcer.fullname" . }}-mutating-webhook.{{ .Release.Namespace }}.svc
+              csi.cert-manager.io/dns-names: {{ include "runtime-enforcer.fullname" . }}-controller-webhook.{{ .Release.Namespace }}.svc
         - name: grpc-certs
           csi:
             driver: "csi.cert-manager.io"

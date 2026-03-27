@@ -123,13 +123,6 @@ func SetupControllers(logger logr.Logger,
 		return fmt.Errorf("failed to add WorkloadPolicyStatusSync to controller: %w", err)
 	}
 
-	if err = (&controller.WorkloadPolicyReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		return fmt.Errorf("unable to create WorkloadPolicyReconciler controller: %w", err)
-	}
-
 	if err = (&controller.WorkloadPolicyProposalReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -302,7 +295,7 @@ func main() {
 	}
 
 	err = builder.WebhookManagedBy(mgr, &securityv1alpha1.WorkloadPolicy{}).
-		WithDefaulter(&controller.PolicyWebhook{}).
+		WithValidator(&controller.PolicyCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 	if err != nil {
 		setupLog.Error(err, "unable to create WorkloadPolicy webhook")

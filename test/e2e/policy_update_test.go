@@ -257,6 +257,11 @@ func getPolicyUpdateTest() types.Feature {
 				}
 				err = r.Delete(ctx, &pod)
 				require.NoError(t, err, "failed to delete pod")
+				err = wait.For(
+					conditions.New(r).ResourceDeleted(&pod),
+					wait.WithTimeout(defaultOperationTimeout),
+				)
+				require.NoError(t, err, "pod %q was not deleted within timeout", podName)
 
 				t.Log("cleaning up policy")
 				err = r.Delete(ctx, &wp)

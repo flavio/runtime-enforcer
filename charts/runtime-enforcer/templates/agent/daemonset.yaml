@@ -85,7 +85,7 @@ spec:
           value: "true"
         {{- end }}
         - name: RUNTIME_ENFORCER_WEBHOOK_ENDPOINT
-          value: {{ include "runtime-enforcer.fullname" . }}-mutating-webhook.{{ .Release.Namespace }}.svc
+          value: {{ include "runtime-enforcer.fullname" . }}-controller-webhook.{{ .Release.Namespace }}.svc
         {{- with .Values.agent.env }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

@@ -2,7 +2,6 @@ package e2e_test
 
 import (
 	"context"
-	"slices"
 	"testing"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/rancher-sandbox/runtime-enforcer/internal/types/policymode"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -113,9 +113,6 @@ func getMainTest() types.Feature {
 				// Delete the ubuntu deployment
 				deleteUbuntuDeployment(ctx, t)
 
-				// Wait for the ubuntu deployment to be deleted
-				waitForUbuntuDeploymentDeleted(ctx, t)
-
 				// Create the ubuntu deployment again with policy label assigned.
 				createAndWaitUbuntuDeployment(ctx, t, withPolicy("test-policy"))
 				return ctx
@@ -125,30 +122,6 @@ func getMainTest() types.Feature {
 				podName, err := findUbuntuDeploymentPod(ctx)
 				require.NoError(t, err)
 				requireExecBlockedInCurrentNamespace(ctx, t, podName, "ubuntu", []string{"mkdir"})
-				return ctx
-			}).
-		Assess("the WorkloadPolicy has the finalizer set",
-			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-				r := getClient(ctx)
-				policy := &v1alpha1.WorkloadPolicy{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-policy",
-						Namespace: getNamespace(ctx),
-					},
-				}
-
-				err := wait.For(
-					conditions.New(r).ResourceMatch(
-						policy,
-						func(obj k8s.Object) bool {
-							wp := obj.(*v1alpha1.WorkloadPolicy)
-							return slices.Contains(wp.Finalizers, v1alpha1.WorkloadPolicyFinalizer)
-						},
-					),
-					wait.WithTimeout(defaultOperationTimeout),
-				)
-				require.NoError(t, err, "WorkloadPolicy finalizer is not set")
-
 				return ctx
 			}).
 		Assess("Verify a non-referenced WorkloadPolicy can be deleted",
@@ -250,33 +223,19 @@ func getMainTest() types.Feature {
 					"failed to create Pod",
 				)
 
-				// Try to delete the referenced policy
-				require.NoError(
-					t,
-					r.Delete(ctx, &referencedPolicy),
-					"failed to issue delete request for WorkloadPolicy",
-				)
+				// The validating webhook must reject the delete while a pod references the policy.
+				err = r.Delete(ctx, &referencedPolicy)
+				require.Error(t, err, "expected delete to be denied while a Pod references the policy")
+				require.True(t, apierrors.IsForbidden(err),
+					"expected 403 Forbidden from validating webhook, got: %v", err)
 
-				// Verify the policy still exists (should not be deleted due to finalizer)
-				err = wait.For(
-					conditions.New(r).ResourceMatch(
-						&referencedPolicy,
-						func(obj k8s.Object) bool {
-							wp := obj.(*v1alpha1.WorkloadPolicy)
-							return wp.DeletionTimestamp != nil &&
-								slices.Contains(wp.Finalizers, v1alpha1.WorkloadPolicyFinalizer)
-						},
-					),
-					wait.WithTimeout(30*time.Second),
-					wait.WithInterval(5*time.Second),
-				)
-				require.NoError(
-					t,
-					err,
-					"WorkloadPolicy should still exist while referenced by Pod",
-				)
+				// Verify the policy still exists
+				err = r.Get(ctx, referencedPolicy.Name, getNamespace(ctx), &referencedPolicy)
+				require.NoError(t, err, "WorkloadPolicy should still exist after denied delete")
+				require.Nil(t, referencedPolicy.DeletionTimestamp,
+					"WorkloadPolicy must not be terminating after a denied delete")
 
-				// Clean up pod, then policy should be deleted automatically
+				// Remove the pod
 				require.NoError(
 					t,
 					r.Delete(ctx, &pod),
@@ -295,7 +254,10 @@ func getMainTest() types.Feature {
 					"Pod was not deleted within timeout",
 				)
 
-				// Now the policy should be deleted automatically
+				// Now the policy can be deleted.
+				require.NoError(t, r.Delete(ctx, &referencedPolicy),
+					"failed to delete WorkloadPolicy after Pod was removed")
+
 				err = wait.For(
 					conditions.New(r).ResourceDeleted(&referencedPolicy),
 					wait.WithTimeout(2*time.Minute),

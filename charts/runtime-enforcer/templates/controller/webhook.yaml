@@ -12,7 +12,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "runtime-enforcer.fullname" . }}-mutating-webhook
+      name: {{ include "runtime-enforcer.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
       path: /mutate-security-rancher-io-v1alpha1-workloadpolicyproposal
   failurePolicy: Fail
@@ -31,23 +31,32 @@ webhooks:
   matchConditions:
   - name: no-owner-reference-uid
     expression: '!has(object.metadata.ownerReferences) || object.metadata.ownerReferences.size() == 0 || object.metadata.ownerReferences[0].uid.size() == 0'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "runtime-enforcer.fullname" . }}-validating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "runtime-enforcer.caIssuerName" . }}
+  labels:
+  {{- include "runtime-enforcer.labels" . | nindent 4 }}
+webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: {{ include "runtime-enforcer.fullname" . }}-mutating-webhook
+      name: {{ include "runtime-enforcer.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
-      path: /mutate-security-rancher-io-v1alpha1-workloadpolicy
+      path: /validate-security-rancher-io-v1alpha1-workloadpolicy
   failurePolicy: Fail
-  name: workloadpolicies.rancher.io
+  name: validate-workloadpolicies.rancher.io
   rules:
   - apiGroups:
     - security.rancher.io
     apiVersions:
     - v1alpha1
     operations:
-    - CREATE
-    - UPDATE
+    - DELETE
     resources:
     - workloadpolicies
   sideEffects: None

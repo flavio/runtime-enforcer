@@ -7,10 +7,6 @@ import (
 )
 
 const (
-	// WorkloadPolicyFinalizer is added to WorkloadPolicy resources to ensure
-	// they are not deleted while still in use by Pods.
-	WorkloadPolicyFinalizer = "workloadpolicy.security.rancher.io/finalizer"
-
 	// PromotedFromLabelKey is set on a WorkloadPolicy when it is created by
 	// promoting a WorkloadPolicyProposal.
 	// The learning controller uses it to avoid recreating proposals for
