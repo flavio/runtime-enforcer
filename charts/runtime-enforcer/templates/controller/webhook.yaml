@@ -16,7 +16,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-security-rancher-io-v1alpha1-workloadpolicyproposal
   failurePolicy: Fail
-  name: workloadpolicyproposals.rancher.io
+  name: mutate-workloadpolicyproposals.rancher.io
   rules:
   - apiGroups:
     - security.rancher.io
