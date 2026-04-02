@@ -28,8 +28,8 @@ const (
 	Transitioning Phase = "Transitioning"
 	// Failed indicates that the policy deployment has failed.
 	Failed Phase = "Failed"
-	// Active indicates that the policy is active.
-	Active Phase = "Active"
+	// Ready indicates that the policy is ready.
+	Ready Phase = "Ready"
 )
 
 type WorkloadPolicyExecutables struct {
