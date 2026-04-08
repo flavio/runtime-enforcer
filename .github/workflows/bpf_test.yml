@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: "go.mod"
@@ -43,5 +45,5 @@ jobs:
         uses: ./.github/actions/bpfvalidator
         with:
           args: |
-            --config=$GITHUB_WORKSPACE/bpfvalidator-${{ matrix.arch }}-config.yaml --cmd="$GITHUB_WORKSPACE/tester -test.v"
+            --config=${{ github.workspace }}/bpfvalidator-${{ matrix.arch }}-config.yaml --cmd=${{ github.workspace }}/tester -test.v
           arch: ${{ matrix.arch }}
