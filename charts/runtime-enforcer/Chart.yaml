@@ -1,6 +1,6 @@
 apiVersion: v2
 name: runtime-enforcer
-description: SUSE Security Runtime Enforcer helm chart
+description: Kubewarden Runtime Enforcer helm chart
 type: application
 version: 0.1.11
 appVersion: v0.9.0
