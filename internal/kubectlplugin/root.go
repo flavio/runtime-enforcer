@@ -46,7 +46,7 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "runtime-enforcer",
-		Long:    "Kubernetes plugin for SUSE Security Runtime Enforcer",
+		Long:    "Kubernetes plugin for Kubewarden Runtime Enforcer",
 		Version: version,
 		Args:    cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

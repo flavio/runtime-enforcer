@@ -4,7 +4,7 @@
 
 ### Synopsis
 
-Kubernetes plugin for SUSE Security Runtime Enforcer
+Kubernetes plugin for Kubewarden Runtime Enforcer
 
 ```
 runtime-enforcer [flags]
