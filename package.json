@@ -1,0 +1,13 @@
+{
+  "name": "runtime-enforcer-tooling",
+  "private": true,
+  "description": "Node.js tooling used by CI (commitlint). Not part of the shipped product.",
+  "type": "module",
+  "scripts": {
+    "commitlint": "commitlint"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "20.5.0",
+    "@commitlint/config-conventional": "20.5.0"
+  }
+}

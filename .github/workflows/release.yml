@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Build image
-        uses: ./.github/actions/container-build
+        uses: $/.github/actions/container-build
         with:
           arch: ${{ matrix.arch }}
           dockerfile: package/Dockerfile.${{ matrix.component }}
@@ -50,7 +50,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Merge images
-        uses: ./.github/actions/merge-multiarch
+        uses: $/.github/actions/merge-multiarch
         with:
           arch: amd64,arm64
           image: ${{ matrix.component }}
@@ -82,7 +82,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Attestation
-        uses: ./.github/actions/attestation
+        uses: $/.github/actions/attestation
         with:
           arch: ${{ matrix.arch }}
           image: ${{ matrix.component }}
@@ -230,7 +230,7 @@ jobs:
             });
   update-charts:
     needs: [create-release]
-    uses: ./.github/workflows/update-charts.yml
+    uses: $/.github/workflows/update-charts.yml
     permissions:
       contents: write # for updatecli to update the repository
       pull-requests: write # for updatecli to create a PR
