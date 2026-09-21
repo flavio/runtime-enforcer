@@ -33,6 +33,7 @@ tilt-settings.yaml
 
 # local development tools
 .husky
+node_modules/
 
 # bpf objects
 internal/bpf/bpf_*bpfeb.o

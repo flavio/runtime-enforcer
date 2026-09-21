@@ -53,3 +53,13 @@ updates:
       interval: "daily"
     cooldown:
       default-days: 7
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
+    groups:
+      commitlint:
+        patterns:
+          - "@commitlint/*"
