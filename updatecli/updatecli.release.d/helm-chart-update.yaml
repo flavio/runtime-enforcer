@@ -104,6 +104,36 @@ targets:
     spec:
       file: charts/runtime-enforcer/values.yaml
       key: $.debugger.image.tag
+  # The following targets keep the artifacthub.io/images annotation, in
+  # charts/runtime-enforcer/Chart.yaml, in sync with the image tags in
+  # values.yaml.
+  update_controller_artifacthub_annotation:
+    scmid: default
+    name: update controller image in artifacthub.io/images annotation
+    kind: file
+    sourceid: releaseVersion
+    spec:
+      file: charts/runtime-enforcer/Chart.yaml
+      matchpattern: 'image: ghcr\.io/kubewarden/runtime-enforcer/controller:(v?\S+)'
+      replacepattern: 'image: ghcr.io/kubewarden/runtime-enforcer/controller:{{ source "releaseVersion" }}'
+  update_agent_artifacthub_annotation:
+    scmid: default
+    name: update agent image in artifacthub.io/images annotation
+    kind: file
+    sourceid: releaseVersion
+    spec:
+      file: charts/runtime-enforcer/Chart.yaml
+      matchpattern: 'image: ghcr\.io/kubewarden/runtime-enforcer/agent:(v?\S+)'
+      replacepattern: 'image: ghcr.io/kubewarden/runtime-enforcer/agent:{{ source "releaseVersion" }}'
+  update_debugger_artifacthub_annotation:
+    scmid: default
+    name: update debugger image in artifacthub.io/images annotation
+    kind: file
+    sourceid: releaseVersion
+    spec:
+      file: charts/runtime-enforcer/Chart.yaml
+      matchpattern: 'image: ghcr\.io/kubewarden/runtime-enforcer/debugger:(v?\S+)'
+      replacepattern: 'image: ghcr.io/kubewarden/runtime-enforcer/debugger:{{ source "releaseVersion" }}'
   generate_values_schema:
     kind: shell
     disablesourceinput: true
