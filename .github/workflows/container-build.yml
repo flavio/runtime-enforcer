@@ -31,7 +31,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Build image
-        uses: ./.github/actions/container-build
+        uses: $/.github/actions/container-build
         with:
           arch: ${{ matrix.arch }}
           dockerfile: package/Dockerfile.${{ matrix.component }}
@@ -54,7 +54,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Merge images
-        uses: ./.github/actions/merge-multiarch
+        uses: $/.github/actions/merge-multiarch
         with:
           arch: amd64,arm64
           image: ${{ matrix.component }}

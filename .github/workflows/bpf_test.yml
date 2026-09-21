@@ -45,7 +45,7 @@ jobs:
         run: |
           make test-bpf
       - name: Validate bpf tests using bpfvalidator
-        uses: ./.github/actions/bpfvalidator
+        uses: $/.github/actions/bpfvalidator
         with:
           args: |
             --config=${{ github.workspace }}/bpfvalidator-${{ matrix.arch }}-config.yaml --cmd=${{ github.workspace }}/tester -test.v
