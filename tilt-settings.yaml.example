@@ -1,9 +1,8 @@
 controller:
-    image: <your-repository>/controller
-agent: 
-    image: <your-repository>/agent
-    enable-otel-tracing: true/false
+  image: <your-repository>/controller
+agent:
+  image: <your-repository>/agent
 debugger:
-    image: <your-repository>/debugger
+  image: <your-repository>/debugger
 clusters:
-    - <your non-kind cluster>
+  - <your non-kind cluster>
