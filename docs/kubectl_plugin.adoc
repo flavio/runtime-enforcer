@@ -2,6 +2,8 @@
 
 The `kubectl runtime-enforcer` plugin wraps common operations for `WorkloadPolicyProposal` and `WorkloadPolicy` CRDs.
 
+This guide shows the main workflows. For the full list of commands and flags, see the generated link:kubectl-plugin/cli-docs.adoc[command reference].
+
 [[install]]
 == Installation
 
@@ -88,8 +90,8 @@ To limit or expand allowed executables, add or remove executable paths on a per-
 *Plugin:*
 
 ```bash
-kubectl runtime-enforcer policy exec allow <POLICY> <container> <executable-path> [<executable-path>...]
-kubectl runtime-enforcer policy exec deny  <POLICY> <container> <executable-path> [<executable-path>...]
+kubectl runtime-enforcer policy allow <POLICY> <container> <executable-path> [<executable-path>...]
+kubectl runtime-enforcer policy deny  <POLICY> <container> <executable-path> [<executable-path>...]
 ```
 
 === Show protection mappings

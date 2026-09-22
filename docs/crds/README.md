@@ -4,25 +4,13 @@ The CRDs documentation is generated automatically by using <https://github.com/e
 
 ## Documentation generation
 
-### Markdown
-
-To generate markdown documentation:
-
-```shell
-make markdown
-```
-
-The result will be save to the `crd.md` file.
-
-### ASCIIDoc
-
-To generate asciidoc documentation:
+To generate the AsciiDoc documentation:
 
 ```shell
 make asciidoc
 ```
 
-The result will be save to the `crd.adoc` file.
+The result will be saved to the `CRD-docs-for-docs-repo.adoc` file.
 
 ## Development notes
 
