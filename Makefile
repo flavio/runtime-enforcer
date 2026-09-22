@@ -79,7 +79,7 @@ generate-crd-docs: ## Generate CRD documentation.
 
 .PHONY: generate-kubectl-plugin-docs
 generate-kubectl-plugin-docs: ## Generate kubectl plugin docs.
-	go run ./internal/tools/docgen -out docs/kubectl-plugin
+	go run ./internal/tools/docgen -out docs/kubectl-plugin/cli-docs.adoc
 
 .PHONY: test
 test: generate-ebpf vet setup-envtest ## Run tests.
