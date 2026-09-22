@@ -1,0 +1,52 @@
+name: Sync Helm chart to kubewarden/helm-charts
+
+# The Helm chart source of truth lives in this repository under
+# charts/runtime-enforcer. The kubewarden/helm-charts repository holds a mirror
+# that is synced by its "Sync runtime-enforcer Helm chart" workflow, which
+# listens for a `release-runtime-enforcer` repository_dispatch event.
+#
+# The chart version is bumped by the updatecli PR opened at release time
+# (see update-charts.yml). Once that PR is merged into main, Chart.yaml changes
+# and this workflow notifies helm-charts so it can open the sync PR.
+on:
+  push:
+    branches: [main]
+    paths:
+      - charts/runtime-enforcer/Chart.yaml
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sync-helm-charts:
+    name: Trigger Helm chart sync in helm-charts
+    runs-on: ubuntu-latest
+    # Forks do not have the GitHub App secrets and must not notify helm-charts
+    if: github.repository_owner == 'kubewarden'
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: generate-token
+        with:
+          app-id: ${{ secrets.APP_ID }} # zizmor: ignore[secrets-outside-env]
+          private-key: ${{ secrets.APP_PRIVATE_KEY }} # zizmor: ignore[secrets-outside-env]
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            helm-charts
+          # minimum permission required to trigger a repository_dispatch on helm-charts
+          permission-contents: write
+
+      - name: Trigger chart sync
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          SOURCE_REPO: ${{ github.repository }}
+          GIT_SHA: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          jq -n \
+            --arg source_repo "$SOURCE_REPO" \
+            --arg sha "$GIT_SHA" \
+            '{"event_type":"release-runtime-enforcer","client_payload":{"source_repo":$source_repo,"sha":$sha}}' \
+            > payload.json
+          gh api "repos/$REPO_OWNER/helm-charts/dispatches" \
+            -X POST \
+            --input payload.json
