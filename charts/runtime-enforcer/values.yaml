@@ -176,7 +176,7 @@ debugger:
     repository: ghcr.io/kubewarden/runtime-enforcer/debugger
     # The image tag used by debugger
     # @schema required
-    tag: v0.10.0
+    tag: v0.10.1
     pullPolicy: IfNotPresent
   resources:
     limits:
