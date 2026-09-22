@@ -25,6 +25,9 @@ body:
           - [ ] Check if agent and controller's image versions are correctly bumped.
           - [ ] Check if app version and chart version are correctly bumped.
           - [ ] Check if CI for the Helm chart PR is green. If so, merge it.
+        - [ ] Verify the "Sync Helm chart to kubewarden/helm-charts" workflow ran after the merge and opened a "runtime-enforcer helm chart update" PR in [kubewarden/helm-charts](https://github.com/kubewarden/helm-charts/pulls).
+          - [ ] If it did not, trigger the [update-runtime-enforcer](https://github.com/kubewarden/helm-charts/actions/workflows/update-runtime-enforcer.yaml) workflow manually.
+          - [ ] Check if CI for the helm-charts PR is green. If so, merge it.
         - [ ] Verify that helm release is correctly created and new version in helm repo is accessible.
         - [ ] Close the released milestone on GH and move everything in that milestone to the next one.
         - [ ] Try the quickstart and see if everything works.
