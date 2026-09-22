@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        This issue tracks the release of a new version of Runtime Enforcer. 
+        This issue tracks the release of a new version of Runtime Enforcer.
 
   - type: textarea
     attributes:
@@ -17,7 +17,7 @@ body:
         This issue tracks the release of a new version of Runtime Enforcer. Please follow the checklist below to ensure a smooth release process.
         - [ ] Make sure CI is green
         - [ ] Verify that release-drafter already prepared a *draft* release with the version tag with release notes.
-        - [ ] Tag runtime-enforcer (manually, through `git tag` and `git push --tags`)
+        - [ ] Tag runtime-enforcer (manually, through `git tag -s -a -m "<VERSION>" <VERSION>` and `git push --tags`)
         - [ ] Verify the "Create a new release for RuntimeEnforcer (release.yml)" workflow completes without problem
           - [ ] Verify the draft release is now published
           - [ ] Verify that the container images are published on ghcr.io
