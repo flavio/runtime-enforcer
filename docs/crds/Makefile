@@ -7,8 +7,8 @@ all: markdown asciidoc
 
 .PHONY: markdown
 markdown:
-	$(CRD_REF_DOCS) --log-level INFO --config=config.yml --renderer=markdown --source-path=../../api --output-path=../crd.md  --templates-dir=templates/markdown
+	$(CRD_REF_DOCS) --log-level INFO --config=config.yml --renderer=markdown --source-path=../../api --output-path=CRD-docs-for-docs-repo.md  --templates-dir=templates/markdown
 
 .PHONY: asciidoc
 asciidoc:
-	$(CRD_REF_DOCS) --log-level INFO --config=config.yml --renderer=asciidoctor --source-path=../../api --output-path=../crd.adoc --templates-dir=templates/asciidoctor
+	$(CRD_REF_DOCS) --log-level INFO --config=config.yml --renderer=asciidoctor --source-path=../../api --output-path=CRD-docs-for-docs-repo.adoc --templates-dir=templates/asciidoctor

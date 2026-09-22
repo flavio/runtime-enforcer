@@ -241,7 +241,7 @@ This will:
 
 - Update all the generated Go code
 - Update the CRDs and the RBAC rules shipped by our Helm chart
-- Update the CRD reference in `docs/crd.adoc`
+- Update the CRD reference in `docs/crds/CRD-docs-for-docs-repo.adoc`
 - Update the eBPF objects in `internal/bpf`
 - Update the gRPC code in `proto/`
 - Update the clientset, informers and listers in `pkg/generated`
@@ -407,8 +407,9 @@ release process. Open a new issue from that template to track a release. The
 ## Additional Resources
 
 - **Developer Documentation**: The `docs/` folder contains the generated CRD
-  reference (`crd.adoc`), the kubectl plugin guide (`kubectl_plugin.adoc`) and
-  the kubectl plugin command reference (`kubectl-plugin/`).
+  reference (`crds/CRD-docs-for-docs-repo.adoc`), the kubectl plugin guide
+  (`kubectl_plugin.adoc`) and the kubectl plugin command reference
+  (`kubectl-plugin/`).
 - **RFCs**: The `docs/rfc` folder holds design proposals and architectural
   decisions.
 - **User Documentation**: The user documentation is at

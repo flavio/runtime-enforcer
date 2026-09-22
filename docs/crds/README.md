@@ -12,7 +12,7 @@ To generate markdown documentation:
 make markdown
 ```
 
-The result will be save to the `crd.md` file.
+The result will be saved to the `CRD-docs-for-docs-repo.md` file.
 
 ### ASCIIDoc
 
@@ -22,7 +22,7 @@ To generate asciidoc documentation:
 make asciidoc
 ```
 
-The result will be save to the `crd.adoc` file.
+The result will be saved to the `CRD-docs-for-docs-repo.adoc` file.
 
 ## Development notes
 
