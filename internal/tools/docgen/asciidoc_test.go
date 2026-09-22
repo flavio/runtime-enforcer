@@ -50,7 +50,7 @@ func newFixtureRootCmd() *cobra.Command {
 func TestGenAsciiDoc_StartsWithDoctitleAndBlankLine(t *testing.T) {
 	var buf bytes.Buffer
 
-	require.NoError(t, genAsciiDoc(newFixtureRootCmd(), "", &buf))
+	require.NoError(t, genASCIIDoc(newFixtureRootCmd(), "", &buf))
 
 	lines := bytes.SplitN(buf.Bytes(), []byte("\n"), 3)
 	require.GreaterOrEqual(t, len(lines), 3)
@@ -64,7 +64,7 @@ func TestGenAsciiDoc_StartsWithDoctitleAndBlankLine(t *testing.T) {
 func TestGenAsciiDoc_Prefix(t *testing.T) {
 	var buf bytes.Buffer
 
-	require.NoError(t, genAsciiDoc(newFixtureRootCmd(), "kubectl ", &buf))
+	require.NoError(t, genASCIIDoc(newFixtureRootCmd(), "kubectl ", &buf))
 	out := buf.String()
 
 	require.Contains(t, out, "= Command-Line Help for `kubectl root`")
@@ -79,7 +79,7 @@ func TestGenAsciiDoc_Prefix(t *testing.T) {
 func TestGenAsciiDoc_RealRootCmd(t *testing.T) {
 	var buf bytes.Buffer
 
-	require.NoError(t, genAsciiDoc(kubectlplugin.NewRootCmd(), "kubectl ", &buf))
+	require.NoError(t, genASCIIDoc(kubectlplugin.NewRootCmd(), "kubectl ", &buf))
 	require.NotEmpty(t, buf.String())
 	require.Contains(t, buf.String(), "[#runtime-enforcer]")
 	require.Contains(t, buf.String(), "== `kubectl runtime-enforcer`")

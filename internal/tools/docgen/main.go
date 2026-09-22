@@ -26,14 +26,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := genAsciiDoc(kubectlplugin.NewRootCmd(), "kubectl ", f); err != nil {
+	err = genASCIIDoc(kubectlplugin.NewRootCmd(), "kubectl ", f)
+	if err != nil {
 		_ = f.Close()
 		log.Fatal(err)
 	}
 
 	// Close is not deferred. A write error can surface at Close, and a
 	// truncated file must not exit 0.
-	if err := f.Close(); err != nil {
+	err = f.Close()
+	if err != nil {
 		log.Fatal(err)
 	}
 }

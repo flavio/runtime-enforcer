@@ -164,7 +164,7 @@ func writeCommand(buf *bytes.Buffer, prefix string, cmd *cobra.Command) {
 	}
 }
 
-// genAsciiDoc writes one AsciiDoc document to w. The document holds
+// genASCIIDoc writes one AsciiDoc document to w. The document holds
 // the help content for root and every one of its subcommands. The
 // document starts with a doctitle and a blank line (lines 1 and 2). A
 // page in the docs site can include the document with
@@ -173,11 +173,12 @@ func writeCommand(buf *bytes.Buffer, prefix string, cmd *cobra.Command) {
 // prefix is text that goes in front of the command path everywhere the
 // reader sees it. Pass "kubectl " for a plugin that always runs through
 // kubectl, or "" when the reader runs the binary on its own.
-func genAsciiDoc(root *cobra.Command, prefix string, w io.Writer) error {
+func genASCIIDoc(root *cobra.Command, prefix string, w io.Writer) error {
 	buf := new(bytes.Buffer)
+	name := displayName(prefix, root)
 
-	fmt.Fprintf(buf, "= Command-Line Help for `%s`\n\n", displayName(prefix, root))
-	fmt.Fprintf(buf, "This document contains the help content for the `%s` command-line program.\n\n", displayName(prefix, root))
+	fmt.Fprintf(buf, "= Command-Line Help for `%s`\n\n", name)
+	fmt.Fprintf(buf, "This document contains the help content for the `%s` command-line program.\n\n", name)
 
 	buf.WriteString("*Command Overview:*\n\n")
 	writeOverviewEntry(buf, prefix, root)
