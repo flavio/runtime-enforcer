@@ -1,3 +1,4 @@
+# renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRD_REF_DOCS_VER := v0.3.0
 CRD_REF_DOCS_BIN := crd-ref-docs
 CRD_REF_DOCS := go run github.com/elastic/crd-ref-docs@$(CRD_REF_DOCS_VER)
