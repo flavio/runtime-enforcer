@@ -2,6 +2,18 @@
   "extends": [
     "github>kubewarden/github-actions//renovate-config/default"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track Go tool versions pinned in Makefiles",
+      "managerFilePatterns": [
+        "/(^|/)Makefile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)(?: versioning=(?<versioning>[^\\s]+))?\\s+[A-Z_]+\\s*[:?]?=\\s*(?<currentValue>\\S+)"
+      ]
+    }
+  ],
   "packageRules": [
     {
       "groupName": "kubernetes",
