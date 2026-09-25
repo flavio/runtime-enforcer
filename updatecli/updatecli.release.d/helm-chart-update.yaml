@@ -1,6 +1,10 @@
 name: Update RuntimeEnforcer chart versions
 
 sources:
+  readmeFile:
+    kind: file
+    spec:
+      file: "./README.md"
   chartVersion:
     name: "Get latest runtime-enforcer helm version"
     kind: yaml
@@ -104,6 +108,14 @@ targets:
     spec:
       file: charts/runtime-enforcer/values.yaml
       key: $.debugger.image.tag
+  update_readme:
+    scmid: default
+    name: Update Helm chart README
+    kind: file
+    sourceid: readmeFile
+    spec:
+      file: charts/runtime-enforcer/README.md
+      forcecreate: true
   # The following targets keep the artifacthub.io/images annotation, in
   # charts/runtime-enforcer/Chart.yaml, in sync with the image tags in
   # values.yaml.
