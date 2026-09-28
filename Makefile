@@ -171,7 +171,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 # renovate: datasource=go depName=github.com/losisin/helm-values-schema-json/v2
-HELM_VALUES_SCHEMA_JSON_VERSION ?= v2.3.1
+HELM_VALUES_SCHEMA_JSON_VERSION ?= v2.6.0
 # renovate: datasource=go depName=google.golang.org/protobuf
 PROTOC_GEN_GO_VERSION ?= v1.36.11
 # renovate: datasource=go depName=google.golang.org/grpc/cmd/protoc-gen-go-grpc
@@ -224,7 +224,11 @@ $(HELM_VALUES_SCHEMA_JSON): | $(LOCALBIN)
 
 .PHONY: generate-chart
 generate-chart: $(HELM_VALUES_SCHEMA_JSON) ## Generate Helm chart values schema.
-	$(HELM_VALUES_SCHEMA_JSON) --no-additional-properties --values charts/runtime-enforcer/values.yaml --output charts/runtime-enforcer/values.schema.json
+	$(HELM_VALUES_SCHEMA_JSON) --no-additional-properties \
+		--k8s-schema-version v1.31.0 \
+		--bundle --bundle-without-id --bundle-cache-min 24h \
+		--values charts/runtime-enforcer/values.yaml \
+		--output charts/runtime-enforcer/values.schema.json
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
